@@ -1,0 +1,6 @@
+@Stayvelle_HostAddress = http://localhost:5124
+
+GET {{Stayvelle_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
