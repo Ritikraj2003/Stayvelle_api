@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Stayvelle.IRepository;
 using Stayvelle.Models;
@@ -8,6 +8,7 @@ namespace Stayvelle.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class UsersController : ControllerBase
     {
         private readonly IUsers _userRepository;
@@ -97,7 +98,15 @@ namespace Stayvelle.Controllers
                 isactive = createUserDTO.isactive,
                 isstaff = createUserDTO.isstaff,
                 isadmin = createUserDTO.isadmin,
-                isdelete = false
+                isdelete = false,
+                Phone = createUserDTO.Phone,
+                role_id = createUserDTO.role_id,
+                role_name = createUserDTO.role_name,
+                ImageUrl = createUserDTO.ImageUrl,
+                CreatedBy = createUserDTO.CreatedBy,
+                CreatedOn = createUserDTO.CreatedOn,
+                ModifiedBy = createUserDTO.ModifiedBy,
+                ModifiedOn = createUserDTO.ModifiedOn
             };
 
             var response = await _userRepository.CreateUserAsync(user);
@@ -140,6 +149,21 @@ namespace Stayvelle.Controllers
                 }
             }
 
+            // Handle ImageUrl: 
+            // - If provided (not null), use it (can be empty string to remove image)
+            // - If null, preserve existing image
+            string? imageUrlToUse;
+            if (updateUserDTO.ImageUrl != null)
+            {
+                // ImageUrl was explicitly provided - use it (even if empty string to remove)
+                imageUrlToUse = string.IsNullOrWhiteSpace(updateUserDTO.ImageUrl) ? null : updateUserDTO.ImageUrl;
+            }
+            else
+            {
+                // ImageUrl was not provided - preserve existing image
+                imageUrlToUse = existingUser.ImageUrl;
+            }
+
             // Update only provided fields
             var userToUpdate = new UsersModel
             {
@@ -148,10 +172,14 @@ namespace Stayvelle.Controllers
                 Email = updateUserDTO.Email ?? existingUser.Email,
                 Password = updateUserDTO.Password ?? existingUser.Password,
                 Username = updateUserDTO.Username ?? existingUser.Username,
+                Phone = updateUserDTO.Phone ?? existingUser.Phone,
+                role_id = updateUserDTO.role_id ?? existingUser.role_id,
+                role_name = updateUserDTO.role_name ?? existingUser.role_name,
                 isactive = updateUserDTO.isactive ?? existingUser.isactive,
                 isstaff = updateUserDTO.isstaff ?? existingUser.isstaff,
                 isadmin = updateUserDTO.isadmin ?? existingUser.isadmin,
-                isdelete = existingUser.isdelete
+                isdelete = existingUser.isdelete,
+                ImageUrl = imageUrlToUse
             };
 
             var updatedUserResponse = await _userRepository.UpdateUserAsync(id, userToUpdate);

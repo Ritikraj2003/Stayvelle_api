@@ -40,7 +40,7 @@ namespace Stayvelle.RepositoryImpl
             }
         }
 
-        // Read - Get All Users (using SQL query)
+        // Read - Get All Users
         public async Task<Response<List<UsersModel>>> GetAllUsersAsync()
         {
             var response = new Response<List<UsersModel>>();
@@ -51,28 +51,23 @@ namespace Stayvelle.RepositoryImpl
                 response.Message = "success";
                 response.Data = res;
                 return response;
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 response.Success = false;
                 response.Message = ex.Message;
                 response.Data = null;
                 return response;
             }
-           
-           
         }
 
-        // Read - Get User by ID (using SQL query)
         public async Task<Response<UsersModel>> GetUserByIdAsync(int id)
         {
             var response = new Response<UsersModel>();
 
             try
             {
-                var userIdParam = new NpgsqlParameter("@Id", id);
-
-                var user = await _context.UsersModel
-                    .FromSqlRaw(UserQuery.GetUserById, userIdParam)
-                    .FirstOrDefaultAsync();
+                var user = await _context.UsersModel.FindAsync(id);
 
                 if (user == null)
                 {
@@ -96,39 +91,30 @@ namespace Stayvelle.RepositoryImpl
             }
         }
 
-
-        // Read - Get User by Email (using SQL query)
         public async Task<Response<UsersModel?>> GetUserByEmailAsync(string email)
         {
             var response = new Response<UsersModel>();
             try
             {
-                var emailParam = new NpgsqlParameter("@Email", email);
-               response.Data= await _context.UsersModel.FromSqlRaw(UserQuery.GetUserByEmail, emailParam).FirstOrDefaultAsync();
+                response.Data = await _context.UsersModel.FirstOrDefaultAsync(u => u.Email == email);
                 response.Success = true;
-                response.Message = "sucess";
+                response.Message = "success";
                 return response;
             }
-            catch ( Exception ex)
+            catch (Exception ex)
             {
                 response.Success = false;
                 response.Message = ex.Message;
                 response.Data = null;
                 return response;
             }
-            
         }
 
-        // Read - Get User by Username (using SQL query)
         public async Task<UsersModel?> GetUserByUsernameAsync(string username)
         {
-            var usernameParam = new NpgsqlParameter("@Username", username);
-            return await _context.UsersModel
-                .FromSqlRaw(UserQuery.GetUserByUsername, usernameParam)
-                .FirstOrDefaultAsync();
+            return await _context.UsersModel.FirstOrDefaultAsync(u => u.Username == username);
         }
 
-        // Update (using SQL query)
         public async Task<Response<UsersModel>> UpdateUserAsync(int id, UsersModel user)
         {
             var response = new Response<UsersModel>();
@@ -146,15 +132,19 @@ namespace Stayvelle.RepositoryImpl
                 }
                 var parameters = new[]
                 {
-            new NpgsqlParameter("@Id", id),
-            new NpgsqlParameter("@Name", user.Name ?? (object)DBNull.Value),
-            new NpgsqlParameter("@Email", user.Email ?? (object)DBNull.Value),
-            new NpgsqlParameter("@Password", user.Password ?? (object)DBNull.Value),
-            new NpgsqlParameter("@Username", user.Username ?? (object)DBNull.Value),
-            new NpgsqlParameter("@isactive", user.isactive),
-            new NpgsqlParameter("@isstaff", user.isstaff),
-            new NpgsqlParameter("@isadmin", user.isadmin)
-        };
+                    new NpgsqlParameter("@Id", id),
+                    new NpgsqlParameter("@Name", user.Name ?? (object)DBNull.Value),
+                    new NpgsqlParameter("@Email", user.Email ?? (object)DBNull.Value),
+                    new NpgsqlParameter("@Password", user.Password ?? (object)DBNull.Value),
+                    new NpgsqlParameter("@Username", user.Username ?? (object)DBNull.Value),
+                    new NpgsqlParameter("@Phone", user.Phone ?? (object)DBNull.Value),
+                    new NpgsqlParameter("@isactive", user.isactive),
+                    new NpgsqlParameter("@isstaff", user.isstaff),
+                    new NpgsqlParameter("@isadmin", user.isadmin),
+                    new NpgsqlParameter("@role_id", user.role_id),
+                    new NpgsqlParameter("@role_name", user.role_name ?? (object)DBNull.Value),
+                    new NpgsqlParameter("@ImageUrl", user.ImageUrl ?? (object)DBNull.Value)
+                };
                 await _context.Database.ExecuteSqlRawAsync(UserQuery.UpdateUser, parameters);
                 return await GetUserByIdAsync(id);
             }
@@ -167,8 +157,6 @@ namespace Stayvelle.RepositoryImpl
             }
         }
 
-
-        // Delete - Hard Delete (using SQL query)
         public async Task<bool> DeleteUserAsync(int id)
         {
             var userIdParam = new NpgsqlParameter("@Id", id);
@@ -176,7 +164,6 @@ namespace Stayvelle.RepositoryImpl
             return rowsAffected > 0;
         }
 
-        // Delete - Soft Delete (using SQL query)
         public async Task<bool> SoftDeleteUserAsync(int id)
         {
             var userIdParam = new NpgsqlParameter("@Id", id);

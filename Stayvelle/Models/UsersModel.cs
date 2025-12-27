@@ -8,8 +8,13 @@
         public string Password { get; set; }
         public string Username { get; set; }
         public bool isactive { get; set; }
+        public string Phone { get; set; }
+        public int role_id { get; set; }
+        public string  role_name { get; set; }
         public bool isstaff { get; set; } 
         public bool isadmin { get; set; } 
         public bool isdelete {  get; set; }
+        public string? ImageUrl { get; set; }
+
     }
 }
