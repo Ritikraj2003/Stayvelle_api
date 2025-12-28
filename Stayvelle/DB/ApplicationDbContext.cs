@@ -17,6 +17,8 @@ namespace Stayvelle.DB
         public DbSet<PermissionModel> PermissionModel { get; set; }
         public DbSet<RolePermissionModel> RolePermissionModel { get; set; }
         public DbSet<RoomModel> RoomModel { get; set; }
+        public DbSet<BookingModel> BookingModel { get; set; }
+        public DbSet<GuestDetailsModel> GuestDetailsModel { get; set; }
         
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -29,6 +31,98 @@ namespace Stayvelle.DB
             modelBuilder.Entity<RoomModel>()
                 .Property(r => r.Id)
                 .ValueGeneratedOnAdd();
+
+            // Configure BookingModel
+            modelBuilder.Entity<BookingModel>()
+                .HasKey(b => b.BookingId);
+
+            modelBuilder.Entity<BookingModel>()
+                .Property(b => b.BookingId)
+                .ValueGeneratedOnAdd();
+
+            modelBuilder.Entity<BookingModel>()
+                .HasOne(b => b.Room)
+                .WithMany()
+                .HasForeignKey(b => b.RoomId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure DateTime properties to be stored as UTC
+            modelBuilder.Entity<BookingModel>()
+                .Property(b => b.CheckInDate)
+                .HasConversion(
+                    v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                    v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            modelBuilder.Entity<BookingModel>()
+                .Property(b => b.CheckOutDate)
+                .HasConversion(
+                    v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                    v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            modelBuilder.Entity<BookingModel>()
+                .Property(b => b.ActualCheckInTime)
+                .HasConversion(
+                    v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                    v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
+
+            modelBuilder.Entity<BookingModel>()
+                .Property(b => b.ActualCheckOutTime)
+                .HasConversion(
+                    v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                    v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
+
+            modelBuilder.Entity<BookingModel>()
+                .Property(b => b.CreatedOn)
+                .HasConversion(
+                    v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                    v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            modelBuilder.Entity<BookingModel>()
+                .Property(b => b.ModifiedOn)
+                .HasConversion(
+                    v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                    v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
+
+            // Configure GuestDetailsModel
+            modelBuilder.Entity<GuestDetailsModel>()
+                .HasKey(g => g.GuestId);
+
+            modelBuilder.Entity<GuestDetailsModel>()
+                .Property(g => g.GuestId)
+                .ValueGeneratedOnAdd();
+
+            modelBuilder.Entity<GuestDetailsModel>()
+                .HasOne(g => g.Booking)
+                .WithMany(b => b.Guests)
+                .HasForeignKey(g => g.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure CommonModel fields for BookingModel
+            modelBuilder.Entity<BookingModel>()
+                .Property(b => b.CreatedBy)
+                .HasDefaultValue("system");
+
+            modelBuilder.Entity<BookingModel>()
+                .Property(b => b.CreatedOn)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Configure CommonModel fields for GuestDetailsModel
+            modelBuilder.Entity<GuestDetailsModel>()
+                .Property(g => g.CreatedBy)
+                .HasDefaultValue("system");
+
+            modelBuilder.Entity<GuestDetailsModel>()
+                .Property(g => g.CreatedOn)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasConversion(
+                    v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                    v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            modelBuilder.Entity<GuestDetailsModel>()
+                .Property(g => g.ModifiedOn)
+                .HasConversion(
+                    v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                    v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
             
             // Configure many-to-many relationship
             modelBuilder.Entity<RolePermissionModel>()

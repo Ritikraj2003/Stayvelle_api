@@ -12,7 +12,13 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Handle circular references by ignoring them
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.WriteIndented = true;
+    });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 
@@ -96,6 +102,7 @@ builder.Services.AddScoped<IPermission, PermissionRepository>();
 builder.Services.AddScoped<ILogin, LoginRepository>();
 builder.Services.AddScoped<IRolePermission, RolePermissionRepository>();
 builder.Services.AddScoped<IRoom, RoomRepository>();
+builder.Services.AddScoped<IBooking, BookingRepository>();
 
 builder.Services.AddCors(options =>
 {

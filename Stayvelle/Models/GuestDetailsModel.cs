@@ -1,0 +1,48 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
+
+namespace Stayvelle.Models
+{
+    public class GuestDetailsModel : CommonModel
+    {
+        [Key]
+        public int GuestId { get; set; }
+
+        // 🔗 Booking relation
+        [Required]
+        public int BookingId { get; set; }
+
+        [ForeignKey("BookingId")]
+        [JsonIgnore] // Prevent circular reference during JSON serialization
+        public BookingModel? Booking { get; set; }
+
+        [Required]
+        [MaxLength(100)]
+        public string GuestName { get; set; } = string.Empty;
+
+        public int Age { get; set; }
+
+        [MaxLength(10)]
+        public string Gender { get; set; } = string.Empty;
+
+        [MaxLength(15)]
+        public string GuestPhone { get; set; } = string.Empty;
+
+        [MaxLength(100)]
+        public string? GuestEmail { get; set; }
+
+        // Aadhaar / PAN / Passport etc.
+        [MaxLength(50)]
+        public string IdProof { get; set; } = string.Empty;
+
+        // Store file path only (NOT base64) - but we'll store base64 for now
+        public string? IdProofImagePath { get; set; }
+
+        public bool IsPrimary { get; set; }
+
+        // Audit
+        public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
+    }
+}
+
