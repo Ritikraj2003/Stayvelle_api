@@ -9,10 +9,12 @@ namespace Stayvelle.RepositoryImpl
     public class BookingRepository : IBooking
     {
         private readonly ApplicationDbContext _context;
+        private readonly IHousekeepingTask _housekeepingTaskRepository;
 
-        public BookingRepository(ApplicationDbContext context)
+        public BookingRepository(ApplicationDbContext context, IHousekeepingTask housekeepingTaskRepository)
         {
             _context = context;
+            _housekeepingTaskRepository = housekeepingTaskRepository;
         }
 
         // Create
@@ -419,13 +421,34 @@ namespace Stayvelle.RepositoryImpl
                 booking.BookingStatus = "CheckedOut";
                 booking.ModifiedOn = DateTime.UtcNow;
 
-                // Update room status back to "Available"
+                // Update room status to "Maintenance"
                 if (booking.Room != null)
                 {
-                    booking.Room.RoomStatus = "Available";
+                    booking.Room.RoomStatus = "Maintenance";
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Create housekeeping task automatically
+                if (booking.Room != null)
+                {
+                    var housekeepingTask = new HousekeepingTask
+                    {
+                        RoomId = booking.RoomId,
+                        BookingId = bookingId,
+                        TaskType = "Cleaning",
+                        TaskStatus = "Pending",
+                        CreatedBy = "system",
+                        CreatedOn = DateTime.UtcNow
+                    };
+
+                    var taskResponse = await _housekeepingTaskRepository.CreateHousekeepingTaskAsync(housekeepingTask);
+                    if (!taskResponse.Success)
+                    {
+                        // Log warning but don't fail the checkout
+                        Console.WriteLine($"Warning: Failed to create housekeeping task for booking {bookingId}: {taskResponse.Message}");
+                    }
+                }
 
                 response.Success = true;
                 response.Message = "Check-out successful";

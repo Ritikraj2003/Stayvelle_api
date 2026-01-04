@@ -19,6 +19,7 @@ namespace Stayvelle.DB
         public DbSet<RoomModel> RoomModel { get; set; }
         public DbSet<BookingModel> BookingModel { get; set; }
         public DbSet<GuestDetailsModel> GuestDetailsModel { get; set; }
+        public DbSet<HousekeepingTask> HousekeepingTask { get; set; }
         
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -137,6 +138,48 @@ namespace Stayvelle.DB
                 .HasOne(rp => rp.Permission)
                 .WithMany(p => p.RolePermissionModel)
                 .HasForeignKey(rp => rp.PermissionId);
+
+            // Configure HousekeepingTask
+            modelBuilder.Entity<HousekeepingTask>()
+                .HasKey(t => t.TaskId);
+
+            modelBuilder.Entity<HousekeepingTask>()
+                .Property(t => t.TaskId)
+                .ValueGeneratedOnAdd();
+
+            modelBuilder.Entity<HousekeepingTask>()
+                .HasOne(t => t.Room)
+                .WithMany()
+                .HasForeignKey(t => t.RoomId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<HousekeepingTask>()
+                .HasOne(t => t.Booking)
+                .WithMany()
+                .HasForeignKey(t => t.BookingId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure DateTime properties for HousekeepingTask
+            modelBuilder.Entity<HousekeepingTask>()
+                .Property(t => t.CreatedOn)
+                .HasConversion(
+                    v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v.ToUniversalTime(),
+                    v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            modelBuilder.Entity<HousekeepingTask>()
+                .Property(t => t.ModifiedOn)
+                .HasConversion(
+                    v => v.HasValue ? (v.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v.Value.ToUniversalTime()) : (DateTime?)null,
+                    v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
+
+            // Configure CommonModel fields for HousekeepingTask
+            modelBuilder.Entity<HousekeepingTask>()
+                .Property(t => t.CreatedBy)
+                .HasDefaultValue("system");
+
+            modelBuilder.Entity<HousekeepingTask>()
+                .Property(t => t.CreatedOn)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
         }
     }
 }

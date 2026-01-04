@@ -100,9 +100,10 @@ builder.Services.AddScoped<IUsers, UserRepository>();
 builder.Services.AddScoped<IRole, RoleRepository>();
 builder.Services.AddScoped<IPermission, PermissionRepository>();
 builder.Services.AddScoped<ILogin, LoginRepository>();
-builder.Services.AddScoped<IRolePermission, RolePermissionRepository>();
-builder.Services.AddScoped<IRoom, RoomRepository>();
-builder.Services.AddScoped<IBooking, BookingRepository>();
+    builder.Services.AddScoped<IRolePermission, RolePermissionRepository>();
+    builder.Services.AddScoped<IRoom, RoomRepository>();
+    builder.Services.AddScoped<IHousekeepingTask, HousekeepingTaskRepository>();
+    builder.Services.AddScoped<IBooking, BookingRepository>();
 
 builder.Services.AddCors(options =>
 {
