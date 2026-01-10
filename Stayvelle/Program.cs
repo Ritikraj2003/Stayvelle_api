@@ -100,10 +100,10 @@ builder.Services.AddScoped<IUsers, UserRepository>();
 builder.Services.AddScoped<IRole, RoleRepository>();
 builder.Services.AddScoped<IPermission, PermissionRepository>();
 builder.Services.AddScoped<ILogin, LoginRepository>();
-    builder.Services.AddScoped<IRolePermission, RolePermissionRepository>();
-    builder.Services.AddScoped<IRoom, RoomRepository>();
-    builder.Services.AddScoped<IHousekeepingTask, HousekeepingTaskRepository>();
-    builder.Services.AddScoped<IBooking, BookingRepository>();
+builder.Services.AddScoped<IRolePermission, RolePermissionRepository>();
+builder.Services.AddScoped<IRoom, RoomRepository>();
+builder.Services.AddScoped<IHousekeepingTask, HousekeepingTaskRepository>();
+builder.Services.AddScoped<IBooking, BookingRepository>();
 
 builder.Services.AddCors(options =>
 {
@@ -129,39 +129,39 @@ using (var scope = app.Services.CreateScope())
         // First, ensure the database exists
         var connectionStringBuilder = new NpgsqlConnectionStringBuilder(connectionString);
         var databaseName = connectionStringBuilder.Database;
-        
+
         // Create connection string to 'postgres' database to check/create target database
         connectionStringBuilder.Database = "postgres";
         var masterConnectionString = connectionStringBuilder.ToString();
-        
+
         using (var masterConnection = new NpgsqlConnection(masterConnectionString))
         {
             masterConnection.Open();
-            
+
             // Check if database exists
             var checkDbCommand = new NpgsqlCommand(
-                $"SELECT 1 FROM pg_database WHERE datname = '{databaseName}'", 
+                $"SELECT 1 FROM pg_database WHERE datname = '{databaseName}'",
                 masterConnection);
             var dbExists = checkDbCommand.ExecuteScalar() != null;
-            
+
             if (!dbExists)
             {
                 // Create the database
                 var createDbCommand = new NpgsqlCommand(
-                    $"CREATE DATABASE \"{databaseName}\"", 
+                    $"CREATE DATABASE \"{databaseName}\"",
                     masterConnection);
                 createDbCommand.ExecuteNonQuery();
                 Console.WriteLine($"Database '{databaseName}' created successfully!");
             }
         }
-        
+
         // Automatic database schema management (NO MIGRATIONS NEEDED!)
         // This will:
         // - Create new tables if they don't exist
         // - Add missing columns to existing tables automatically
         // - Preserve all existing data
         var context = services.GetRequiredService<ApplicationDbContext>();
-        
+
         // First, ensure all tables exist (creates new tables only, doesn't delete existing ones)
         // Note: EnsureCreated() only works if database is completely empty
         // So we also use DatabaseHelper to create missing tables
@@ -173,11 +173,11 @@ using (var scope = app.Services.CreateScope())
         {
             Console.WriteLine($"Note: EnsureCreated() may have skipped some tables: {ex.Message}");
         }
-        
+
         // Then, automatically create missing tables and add missing columns to existing tables
         // This handles new properties added to models without deleting data
         DatabaseHelper.EnsureColumnsExist(context);
-        
+
         Console.WriteLine("✓ Database tables and columns verified/updated successfully!");
     }
     catch (Exception ex)
