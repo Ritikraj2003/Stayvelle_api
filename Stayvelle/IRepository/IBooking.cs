@@ -1,4 +1,5 @@
 using Stayvelle.Models;
+using Stayvelle.Models.DTOs;
 using Stayvelle.Query;
 
 namespace Stayvelle.IRepository
@@ -6,7 +7,7 @@ namespace Stayvelle.IRepository
     public interface IBooking
     {
         // Create
-        Task<Response<BookingModel>> CreateBookingAsync(BookingModel booking);
+        Task<Response<BookingModel>> CreateBookingAsync(CreateBookingDTO bookingDto);
 
         // Read
         Task<Response<List<BookingModel>>> GetAllBookingsAsync();
@@ -20,6 +21,9 @@ namespace Stayvelle.IRepository
         // Check-in and Check-out operations
         Task<Response<BookingModel?>> CheckInAsync(int bookingId);
         Task<Response<BookingModel?>> CheckOutAsync(int bookingId);
+
+        // Extended Details
+        Task<Response<BookingDetailDto?>> GetBookingDetailsAsync(int bookingId);
 
         // Delete
         Task<bool> DeleteBookingAsync(int bookingId);

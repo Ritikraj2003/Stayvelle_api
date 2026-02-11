@@ -17,11 +17,47 @@ namespace Stayvelle.RepositoryImpl
         }
 
         // Create
-        public async Task<Response<UsersModel>> CreateUserAsync(UsersModel user)
+        public async Task<Response<UsersModel>> CreateUserAsync(CreateUserDTO createUserDTO)
         {
             Response<UsersModel> response = new Response<UsersModel>();
             try
             {
+                // Check if email already exists
+                var existingEmail = await _context.UsersModel.FirstOrDefaultAsync(u => u.Email == createUserDTO.Email);
+                if (existingEmail != null)
+                {
+                    response.Success = false;
+                    response.Message = "User with this email already exists";
+                    return response;
+                }
+
+                // Check if username already exists
+                var existingUsername = await _context.UsersModel.FirstOrDefaultAsync(u => u.Username == createUserDTO.Username);
+                if (existingUsername != null)
+                {
+                    response.Success = false;
+                    response.Message = "User with this username already exists";
+                    return response;
+                }
+
+                var user = new UsersModel
+                {
+                    Name = createUserDTO.Name,
+                    Email = createUserDTO.Email,
+                    Password = createUserDTO.Password,
+                    Username = createUserDTO.Username,
+                    isactive = createUserDTO.isactive,
+                    isstaff = createUserDTO.isstaff,
+                    isadmin = createUserDTO.isadmin,
+                    isdelete = false,
+                    Phone = createUserDTO.Phone,
+                    role_id = createUserDTO.role_id,
+                    role_name = createUserDTO.role_name,
+                    ImageUrl = createUserDTO.ImageUrl,
+                    CreatedBy = createUserDTO.CreatedBy,
+                    CreatedOn = DateTime.UtcNow
+                };
+
                 _context.UsersModel.Add(user);
                 await _context.SaveChangesAsync();
 
@@ -115,43 +151,81 @@ namespace Stayvelle.RepositoryImpl
             return await _context.UsersModel.FirstOrDefaultAsync(u => u.Username == username);
         }
 
-        public async Task<Response<UsersModel>> UpdateUserAsync(int id, UsersModel user)
+        public async Task<Response<UsersModel>> UpdateUserAsync(int id, UpdateUserDTO updateUserDTO)
         {
             var response = new Response<UsersModel>();
 
             try
             {
-                var existingUserResponse = await GetUserByIdAsync(id);
+                var existingUser = await _context.UsersModel.FindAsync(id);
 
-                if (!existingUserResponse.Success || existingUserResponse.Data == null)
+                if (existingUser == null)
                 {
                     response.Success = false;
                     response.Message = "User not found";
                     response.Data = null;
                     return response;
                 }
-                var parameters = new[]
+
+                // Check if email is being changed and already exists
+                if (!string.IsNullOrEmpty(updateUserDTO.Email) && updateUserDTO.Email != existingUser.Email)
                 {
-                    new NpgsqlParameter("@Id", id),
-                    new NpgsqlParameter("@Name", user.Name ?? (object)DBNull.Value),
-                    new NpgsqlParameter("@Email", user.Email ?? (object)DBNull.Value),
-                    new NpgsqlParameter("@Password", user.Password ?? (object)DBNull.Value),
-                    new NpgsqlParameter("@Username", user.Username ?? (object)DBNull.Value),
-                    new NpgsqlParameter("@Phone", user.Phone ?? (object)DBNull.Value),
-                    new NpgsqlParameter("@isactive", user.isactive),
-                    new NpgsqlParameter("@isstaff", user.isstaff),
-                    new NpgsqlParameter("@isadmin", user.isadmin),
-                    new NpgsqlParameter("@role_id", user.role_id),
-                    new NpgsqlParameter("@role_name", user.role_name ?? (object)DBNull.Value),
-                    new NpgsqlParameter("@ImageUrl", user.ImageUrl ?? (object)DBNull.Value)
-                };
-                await _context.Database.ExecuteSqlRawAsync(UserQuery.UpdateUser, parameters);
-                return await GetUserByIdAsync(id);
+                    var emailExists = await _context.UsersModel.FirstOrDefaultAsync(u => u.Email == updateUserDTO.Email);
+                    if (emailExists != null)
+                    {
+                        response.Success = false;
+                        response.Message = "User with this email already exists";
+                        return response;
+                    }
+                }
+
+                // Check if username is being changed and already exists
+                if (!string.IsNullOrEmpty(updateUserDTO.Username) && updateUserDTO.Username != existingUser.Username)
+                {
+                    var usernameExists = await _context.UsersModel.FirstOrDefaultAsync(u => u.Username == updateUserDTO.Username);
+                    if (usernameExists != null)
+                    {
+                        response.Success = false;
+                        response.Message = "User with this username already exists";
+                        return response;
+                    }
+                }
+
+                // Update fields
+                existingUser.Name = updateUserDTO.Name ?? existingUser.Name;
+                existingUser.Email = updateUserDTO.Email ?? existingUser.Email;
+                existingUser.Password = updateUserDTO.Password ?? existingUser.Password;
+                existingUser.Username = updateUserDTO.Username ?? existingUser.Username;
+                existingUser.Phone = updateUserDTO.Phone ?? existingUser.Phone;
+                existingUser.role_id = updateUserDTO.role_id ?? existingUser.role_id;
+                existingUser.role_name = updateUserDTO.role_name ?? existingUser.role_name;
+                existingUser.isactive = updateUserDTO.isactive ?? existingUser.isactive;
+                existingUser.isstaff = updateUserDTO.isstaff ?? existingUser.isstaff;
+                existingUser.isadmin = updateUserDTO.isadmin ?? existingUser.isadmin;
+                
+                // Handle ImageUrl
+                // If provided (not null), use it (can be empty string to remove image)
+                // If null, preserve existing image
+                if (updateUserDTO.ImageUrl != null)
+                {
+                    existingUser.ImageUrl = updateUserDTO.ImageUrl;
+                }
+
+                existingUser.ModifiedBy = "system"; // Or pass from DTO if available in common logic 
+                existingUser.ModifiedOn = DateTime.UtcNow;
+
+                _context.UsersModel.Update(existingUser);
+                await _context.SaveChangesAsync();
+
+                response.Success = true;
+                response.Message = "User updated successfully";
+                response.Data = existingUser;
+                return response;
             }
             catch (Exception ex)
             {
                 response.Success = false;
-                response.Message = "Error while updating user"; // don't expose ex.Message
+                response.Message = $"Error while updating user: {ex.Message}";
                 response.Data = null;
                 return response;
             }

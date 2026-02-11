@@ -6,7 +6,7 @@ namespace Stayvelle.IRepository
     public interface IRoom
     {
         // Create
-        Task<Response<RoomModel>> CreateRoomAsync(RoomModel room);
+        Task<Response<RoomModel>> CreateRoomAsync(CreateRoomDTO createRoomDTO);
 
         // Read
         Task<Response<List<RoomModel>>> GetAllRoomsAsync();
@@ -16,7 +16,7 @@ namespace Stayvelle.IRepository
         Task<Response<List<RoomModel>>> GetRoomsByTypeAsync(string roomType);
 
         // Update
-        Task<Response<RoomModel?>> UpdateRoomAsync(int id, RoomModel room);
+        Task<Response<RoomModel?>> UpdateRoomAsync(int id, UpdateRoomDTO updateRoomDTO);
 
         // Delete
         Task<bool> DeleteRoomAsync(int id);

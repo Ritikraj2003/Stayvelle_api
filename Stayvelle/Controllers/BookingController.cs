@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Stayvelle.DB;
+using Microsoft.EntityFrameworkCore;
 using Stayvelle.IRepository;
 using Stayvelle.Models;
+using Stayvelle.Models.DTOs;
 using Stayvelle.Query;
 
 namespace Stayvelle.Controllers
@@ -14,14 +15,10 @@ namespace Stayvelle.Controllers
     public class BookingController : ControllerBase
     {
         private readonly IBooking _bookingRepository;
-        private readonly IRoom _roomRepository;
-        private readonly ApplicationDbContext _context;
 
-        public BookingController(IBooking bookingRepository, IRoom roomRepository, ApplicationDbContext context)
+        public BookingController(IBooking bookingRepository)
         {
             _bookingRepository = bookingRepository;
-            _roomRepository = roomRepository;
-            _context = context;
         }
 
         // GET: api/Booking
@@ -38,9 +35,9 @@ namespace Stayvelle.Controllers
 
         // GET: api/Booking/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<BookingModel>> GetBooking(int id)
+        public async Task<ActionResult<BookingDetailDto>> GetBooking(int id)
         {
-            var response = await _bookingRepository.GetBookingByIdAsync(id);
+            var response = await _bookingRepository.GetBookingDetailsAsync(id);
             if (!response.Success || response.Data == null)
             {
                 return NotFound(new { message = response.Message ?? $"Booking with ID {id} not found" });
@@ -74,7 +71,7 @@ namespace Stayvelle.Controllers
 
         // POST: api/Booking
         [HttpPost]
-        public async Task<ActionResult<BookingModel>> CreateBooking([FromBody] CreateBookingDTO createBookingDTO)
+        public async Task<ActionResult<BookingModel>> CreateBooking([FromForm] CreateBookingDTO createBookingDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -93,95 +90,18 @@ namespace Stayvelle.Controllers
                 return BadRequest(new { message = "At least one guest must be marked as primary" });
             }
 
-            // Validate room exists and is available
-            var roomResponse = await _roomRepository.GetRoomByIdAsync(createBookingDTO.RoomId);
-            if (!roomResponse.Success || roomResponse.Data == null)
-            {
-                return NotFound(new { message = "Room not found" });
-            }
-
-            var room = roomResponse.Data;
-            if (room.RoomStatus != "Available")
-            {
-                return BadRequest(new { message = $"Room is not available. Current status: {room.RoomStatus}" });
-            }
-
-            // Create booking - ensure all DateTime values are UTC
-            var checkInDate = createBookingDTO.CheckInDate.Kind == DateTimeKind.Unspecified 
-                ? DateTime.SpecifyKind(createBookingDTO.CheckInDate, DateTimeKind.Utc) 
-                : createBookingDTO.CheckInDate.ToUniversalTime();
+            // Business logic delegated to Repository
+            var bookingResponse = await _bookingRepository.CreateBookingAsync(createBookingDTO);
             
-            var checkOutDate = createBookingDTO.CheckOutDate.Kind == DateTimeKind.Unspecified 
-                ? DateTime.SpecifyKind(createBookingDTO.CheckOutDate, DateTimeKind.Utc) 
-                : createBookingDTO.CheckOutDate.ToUniversalTime();
-
-            var booking = new BookingModel
-            {
-                RoomId = createBookingDTO.RoomId,
-                CheckInDate = checkInDate,
-                ActualCheckInTime=DateTime.UtcNow,
-                CheckOutDate = checkOutDate,
-                NumberOfGuests = createBookingDTO.NumberOfGuests,
-                BookingStatus = "Booked",
-                CreatedBy = "system", // You can get this from auth service
-                CreatedOn = DateTime.UtcNow,
-                ModifiedBy = string.Empty,
-                ModifiedOn = null
-            };
-
-            // Create guests
-            foreach (var guestDto in createBookingDTO.Guests)
-            {
-                var guest = new GuestDetailsModel
-                {
-                    GuestName = guestDto.GuestName,
-                    Age = guestDto.Age,
-                    Gender = guestDto.Gender,
-                    GuestPhone = guestDto.GuestPhone,
-                    GuestEmail = guestDto.GuestEmail,
-                    IdProof = guestDto.IdProof,
-                    IdProofImagePath = guestDto.IdProofImage, // Store base64 for now
-                    IsPrimary = guestDto.IsPrimary,
-                    CreatedBy = "system", // You can get this from auth service
-                    CreatedOn = DateTime.UtcNow,
-                    ModifiedBy = string.Empty,
-                    ModifiedOn = null
-                };
-                booking.Guests.Add(guest);
-            }
-
-            // Create booking
-            var bookingResponse = await _bookingRepository.CreateBookingAsync(booking);
             if (!bookingResponse.Success || bookingResponse.Data == null)
             {
+                // Determine if it was a Not Found or Bad Request based on message roughly, 
+                // but usually Bad Request for business rule violations
+                if (bookingResponse.Message.Contains("not found"))
+                {
+                    return NotFound(new { message = bookingResponse.Message });
+                }
                 return BadRequest(new { message = bookingResponse.Message });
-            }
-
-            // Update room status to "Occupied"
-            room.RoomStatus = "Occupied";
-            var updateRoom = new RoomModel
-            {
-                Id = room.Id,
-                RoomNumber = room.RoomNumber,
-                Price = room.Price,
-                MaxOccupancy = room.MaxOccupancy,
-                Floor = room.Floor,
-                NumberOfBeds = room.NumberOfBeds,
-                AcType = room.AcType,
-                BathroomType = room.BathroomType,
-                RoomStatus = "Occupied", // Change status
-                RoomType = room.RoomType,
-                IsActive = room.IsActive,
-                Description = room.Description,
-                IsTv = room.IsTv,
-                Images = room.Images
-            };
-
-            var roomUpdateResponse = await _roomRepository.UpdateRoomAsync(room.Id, updateRoom);
-            if (!roomUpdateResponse.Success)
-            {
-                // Log warning but don't fail the booking
-                Console.WriteLine($"Warning: Failed to update room status for room {room.Id}");
             }
 
             return CreatedAtAction(nameof(GetBooking), new { id = bookingResponse.Data.BookingId }, bookingResponse.Data);
@@ -237,48 +157,11 @@ namespace Stayvelle.Controllers
         [HttpDelete("{id}")]
         public async Task<ActionResult> DeleteBooking(int id)
         {
-            // Get booking to find room
-            var bookingResponse = await _bookingRepository.GetBookingByIdAsync(id);
-            if (!bookingResponse.Success || bookingResponse.Data == null)
-            {
-                return NotFound(new { message = $"Booking with ID {id} not found" });
-            }
-
-            var booking = bookingResponse.Data;
-
-            // Delete booking
+            // Delete booking (Logic for resetting room status is in Repository)
             var result = await _bookingRepository.DeleteBookingAsync(id);
             if (!result)
             {
-                return NotFound(new { message = $"Booking with ID {id} not found" });
-            }
-
-            // Update room status back to "Available" if booking was deleted
-            if (booking.RoomId > 0)
-            {
-                var roomResponse = await _roomRepository.GetRoomByIdAsync(booking.RoomId);
-                if (roomResponse.Success && roomResponse.Data != null)
-                {
-                    var room = roomResponse.Data;
-                    var updateRoom = new RoomModel
-                    {
-                        Id = room.Id,
-                        RoomNumber = room.RoomNumber,
-                        Price = room.Price,
-                        MaxOccupancy = room.MaxOccupancy,
-                        Floor = room.Floor,
-                        NumberOfBeds = room.NumberOfBeds,
-                        AcType = room.AcType,
-                        BathroomType = room.BathroomType,
-                        RoomStatus = "Available", // Change back to Available
-                        RoomType = room.RoomType,
-                        IsActive = room.IsActive,
-                        Description = room.Description,
-                        IsTv = room.IsTv,
-                        Images = room.Images
-                    };
-                    await _roomRepository.UpdateRoomAsync(room.Id, updateRoom);
-                }
+                return NotFound(new { message = $"Booking with ID {id} not found or could not be deleted" });
             }
 
             return Ok(new { message = $"Booking with ID {id} deleted successfully" });

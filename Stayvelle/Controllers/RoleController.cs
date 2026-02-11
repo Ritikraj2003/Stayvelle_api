@@ -14,68 +14,22 @@ namespace Stayvelle.Controllers
     public class RoleController : ControllerBase
     {
         private readonly IRole _roleRepository;
-        private readonly IRolePermission _rolePermissionRepository;
-        private readonly IPermission _permissionRepository;
-        private readonly ApplicationDbContext _context;
 
-        public RoleController(
-            IRole roleRepository,
-            IRolePermission rolePermissionRepository,
-            IPermission permissionRepository,
-            ApplicationDbContext context)
+        public RoleController(IRole roleRepository)
         {
             _roleRepository = roleRepository;
-            _rolePermissionRepository = rolePermissionRepository;
-            _permissionRepository = permissionRepository;
-            _context = context;
         }
 
         // GET: api/Role
         [HttpGet]
         public async Task<ActionResult<List<RoleResponseDTO>>> GetAllRoles([FromQuery] string? search = null)
         {
-            var response = await _roleRepository.GetAllRolesAsync();
-            if (!response.Success || response.Data == null)
+            var response = await _roleRepository.GetAllRolesAsync(search);
+            if (!response.Success)
             {
                 return BadRequest(new { message = response.Message });
             }
-
-            var roles = response.Data;
-
-            // Apply search filter if provided
-            if (!string.IsNullOrEmpty(search))
-            {
-                search = search.ToLower();
-                roles = roles.Where(r => 
-                    r.role_name.ToLower().Contains(search) || 
-                    r.Id.ToString().Contains(search)
-                ).ToList();
-            }
-
-            // Get permissions for each role
-            var roleResponseList = new List<RoleResponseDTO>();
-            foreach (var role in roles)
-            {
-                var permissionsResponse = await _permissionRepository.GetPermissionsByRoleIdAsync(role.Id);
-                var permissions = permissionsResponse.Data ?? new List<PermissionModel>();
-
-                roleResponseList.Add(new RoleResponseDTO
-                {
-                    Id = role.Id,
-                    role_name = role.role_name,
-                    isactive = role.isactive,
-                    Permissions = permissions.Select(p => new PermissionDTO
-                    {
-                        Id = p.Id,
-                        Name = p.permission_name,
-                        Description = string.Empty,
-                        Module = p.permission_code,
-                        Action = string.Empty
-                    }).ToList()
-                });
-            }
-
-            return Ok(roleResponseList);
+            return Ok(response.Data);
         }
 
         // GET: api/Role/5
@@ -87,27 +41,7 @@ namespace Stayvelle.Controllers
             {
                 return NotFound(new { message = response.Message ?? $"Role with ID {id} not found" });
             }
-
-            var role = response.Data;
-            var permissionsResponse = await _permissionRepository.GetPermissionsByRoleIdAsync(id);
-            var permissions = permissionsResponse.Data ?? new List<PermissionModel>();
-
-            var roleResponse = new RoleResponseDTO
-            {
-                Id = role.Id,
-                role_name = role.role_name,
-                isactive = role.isactive,
-                Permissions = permissions.Select(p => new PermissionDTO
-                {
-                    Id = p.Id,
-                    Name = p.permission_name,
-                    Description = string.Empty,
-                    Module = p.permission_code,
-                    Action = string.Empty
-                }).ToList()
-            };
-
-            return Ok(roleResponse);
+            return Ok(response.Data);
         }
 
         // POST: api/Role
@@ -119,108 +53,39 @@ namespace Stayvelle.Controllers
                 return BadRequest(ModelState);
             }
 
-            // Check if role name already exists
-            var existingRoleResponse = await _roleRepository.GetRoleByNameAsync(createRoleDTO.role_name);
-            if (existingRoleResponse.Success && existingRoleResponse.Data != null)
-            {
-                return Conflict(new { message = "Role with this name already exists" });
-            }
-
-            // Create role
-            var role = new RoleModel
-            {
-                role_name = createRoleDTO.role_name,
-                isactive = createRoleDTO.isactive,
-                isdelete = false,
-                CreatedBy = createRoleDTO.CreatedBy,
-                CreatedOn = DateTime.UtcNow
-            };
-
-            var roleResponse = await _roleRepository.CreateRoleAsync(role);
+            var roleResponse = await _roleRepository.CreateRoleAsync(createRoleDTO);
             if (!roleResponse.Success || roleResponse.Data == null)
             {
+                if (roleResponse.Message != null && roleResponse.Message.Contains("already exists"))
+                {
+                    return Conflict(new { message = roleResponse.Message });
+                }
                 return BadRequest(new { message = roleResponse.Message });
             }
 
-            var createdRole = roleResponse.Data;
-
-            // Assign permissions to role
-            if (createRoleDTO.PermissionIds != null && createRoleDTO.PermissionIds.Count > 0)
-            {
-                var assignResponse = await _rolePermissionRepository.AssignPermissionsToRoleAsync(
-                    createdRole.Id,
-                    createRoleDTO.PermissionIds,
-                    createRoleDTO.CreatedBy
-                );
-
-                if (!assignResponse.Success)
-                {
-                    // Role created but permissions failed - you might want to handle this differently
-                    return BadRequest(new { message = $"Role created but failed to assign permissions: {assignResponse.Message}" });
-                }
-            }
-
-            // Get the created role with permissions
-            var getRoleResponse = await GetRole(createdRole.Id);
-            return CreatedAtAction(nameof(GetRole), new { id = createdRole.Id }, getRoleResponse.Value);
+            // Repository now returns full DTO
+            return CreatedAtAction(nameof(GetRole), new { id = roleResponse.Data.Id }, roleResponse.Data);
         }
 
         // PUT: api/Role/5
         [HttpPut("{id}")]
         public async Task<ActionResult<RoleResponseDTO>> UpdateRole(int id, [FromBody] UpdateRoleDTO updateRoleDTO)
         {
-            var existingRoleResponse = await _roleRepository.GetRoleByIdAsync(id);
-            if (!existingRoleResponse.Success || existingRoleResponse.Data == null)
-            {
-                return NotFound(new { message = existingRoleResponse.Message ?? $"Role with ID {id} not found" });
-            }
-
-            var existingRole = existingRoleResponse.Data;
-
-            // Check if name is being changed and already exists
-            if (!string.IsNullOrEmpty(updateRoleDTO.role_name) && updateRoleDTO.role_name != existingRole.role_name)
-            {
-                var nameCheckResponse = await _roleRepository.GetRoleByNameAsync(updateRoleDTO.role_name);
-                if (nameCheckResponse.Success && nameCheckResponse.Data != null && nameCheckResponse.Data.Id != id)
-                {
-                    return Conflict(new { message = "Role with this name already exists" });
-                }
-            }
-
-            // Update role
-            var roleToUpdate = new RoleModel
-            {
-                Id = id,
-                role_name = updateRoleDTO.role_name ?? existingRole.role_name,
-                isactive = updateRoleDTO.isactive ?? existingRole.isactive,
-                isdelete = existingRole.isdelete,
-                ModifiedBy = updateRoleDTO.ModifiedBy,
-                ModifiedOn = DateTime.UtcNow
-            };
-
-            var updateResponse = await _roleRepository.UpdateRoleAsync(id, roleToUpdate);
+            var updateResponse = await _roleRepository.UpdateRoleAsync(id, updateRoleDTO);
             if (!updateResponse.Success || updateResponse.Data == null)
             {
+                if (updateResponse.Message != null && updateResponse.Message.Contains("already exists"))
+                {
+                    return Conflict(new { message = updateResponse.Message });
+                }
+                if (updateResponse.Message != null && updateResponse.Message.Contains("not found"))
+                {
+                    return NotFound(new { message = updateResponse.Message });
+                }
                 return BadRequest(new { message = updateResponse.Message });
             }
 
-            // Update permissions if provided
-            if (updateRoleDTO.PermissionIds != null)
-            {
-                var assignResponse = await _rolePermissionRepository.UpdateRolePermissionsAsync(
-                    id,
-                    updateRoleDTO.PermissionIds,
-                    updateRoleDTO.ModifiedBy
-                );
-
-                if (!assignResponse.Success)
-                {
-                    return BadRequest(new { message = $"Role updated but failed to update permissions: {assignResponse.Message}" });
-                }
-            }
-
-            // Get the updated role with permissions
-            return await GetRole(id);
+            return Ok(updateResponse.Data);
         }
 
         // DELETE: api/Role/5

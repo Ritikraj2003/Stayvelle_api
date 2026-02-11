@@ -75,43 +75,13 @@ namespace Stayvelle.Controllers
                 return BadRequest(ModelState);
             }
 
-            // Check if email already exists
-            var existingEmailResponse = await _userRepository.GetUserByEmailAsync(createUserDTO.Email);
-            if (existingEmailResponse.Success && existingEmailResponse.Data != null)
-            {
-                return Conflict(new { message = "User with this email already exists" });
-            }
-
-            // Check if username already exists
-            var existingUsername = await _userRepository.GetUserByUsernameAsync(createUserDTO.Username);
-            if (existingUsername != null)
-            {
-                return Conflict(new { message = "User with this username already exists" });
-            }
-
-            var user = new UsersModel
-            {
-                Name = createUserDTO.Name,
-                Email = createUserDTO.Email,
-                Password = createUserDTO.Password,
-                Username = createUserDTO.Username,
-                isactive = createUserDTO.isactive,
-                isstaff = createUserDTO.isstaff,
-                isadmin = createUserDTO.isadmin,
-                isdelete = false,
-                Phone = createUserDTO.Phone,
-                role_id = createUserDTO.role_id,
-                role_name = createUserDTO.role_name,
-                ImageUrl = createUserDTO.ImageUrl,
-                CreatedBy = createUserDTO.CreatedBy,
-                CreatedOn = createUserDTO.CreatedOn,
-                ModifiedBy = createUserDTO.ModifiedBy,
-                ModifiedOn = createUserDTO.ModifiedOn
-            };
-
-            var response = await _userRepository.CreateUserAsync(user);
+            var response = await _userRepository.CreateUserAsync(createUserDTO);
             if (!response.Success || response.Data == null)
             {
+                if (response.Message != null && response.Message.Contains("already exists"))
+                {
+                     return Conflict(new { message = response.Message });
+                }
                 return BadRequest(new { message = response.Message });
             }
             return CreatedAtAction(nameof(GetUser), new { id = response.Data.Id }, response.Data);
@@ -121,71 +91,18 @@ namespace Stayvelle.Controllers
         [HttpPut("{id}")]
         public async Task<ActionResult<UsersModel>> UpdateUser(int id, [FromBody] UpdateUserDTO updateUserDTO)
         {
-            var existingUserResponse = await _userRepository.GetUserByIdAsync(id);
-            if (!existingUserResponse.Success || existingUserResponse.Data == null)
-            {
-                return NotFound(new { message = existingUserResponse.Message ?? $"User with ID {id} not found" });
-            }
-
-            var existingUser = existingUserResponse.Data;
-
-            // Check if email is being changed and already exists
-            if (!string.IsNullOrEmpty(updateUserDTO.Email) && updateUserDTO.Email != existingUser.Email)
-            {
-                var emailExistsResponse = await _userRepository.GetUserByEmailAsync(updateUserDTO.Email);
-                if (emailExistsResponse.Success && emailExistsResponse.Data != null)
-                {
-                    return Conflict(new { message = "User with this email already exists" });
-                }
-            }
-
-            // Check if username is being changed and already exists
-            if (!string.IsNullOrEmpty(updateUserDTO.Username) && updateUserDTO.Username != existingUser.Username)
-            {
-                var usernameExists = await _userRepository.GetUserByUsernameAsync(updateUserDTO.Username);
-                if (usernameExists != null)
-                {
-                    return Conflict(new { message = "User with this username already exists" });
-                }
-            }
-
-            // Handle ImageUrl: 
-            // - If provided (not null), use it (can be empty string to remove image)
-            // - If null, preserve existing image
-            string? imageUrlToUse;
-            if (updateUserDTO.ImageUrl != null)
-            {
-                // ImageUrl was explicitly provided - use it (even if empty string to remove)
-                imageUrlToUse = string.IsNullOrWhiteSpace(updateUserDTO.ImageUrl) ? null : updateUserDTO.ImageUrl;
-            }
-            else
-            {
-                // ImageUrl was not provided - preserve existing image
-                imageUrlToUse = existingUser.ImageUrl;
-            }
-
-            // Update only provided fields
-            var userToUpdate = new UsersModel
-            {
-                Id = id,
-                Name = updateUserDTO.Name ?? existingUser.Name,
-                Email = updateUserDTO.Email ?? existingUser.Email,
-                Password = updateUserDTO.Password ?? existingUser.Password,
-                Username = updateUserDTO.Username ?? existingUser.Username,
-                Phone = updateUserDTO.Phone ?? existingUser.Phone,
-                role_id = updateUserDTO.role_id ?? existingUser.role_id,
-                role_name = updateUserDTO.role_name ?? existingUser.role_name,
-                isactive = updateUserDTO.isactive ?? existingUser.isactive,
-                isstaff = updateUserDTO.isstaff ?? existingUser.isstaff,
-                isadmin = updateUserDTO.isadmin ?? existingUser.isadmin,
-                isdelete = existingUser.isdelete,
-                ImageUrl = imageUrlToUse
-            };
-
-            var updatedUserResponse = await _userRepository.UpdateUserAsync(id, userToUpdate);
+            var updatedUserResponse = await _userRepository.UpdateUserAsync(id, updateUserDTO);
             if (!updatedUserResponse.Success || updatedUserResponse.Data == null)
             {
-                return NotFound(new { message = updatedUserResponse.Message ?? $"User with ID {id} not found" });
+                 if (updatedUserResponse.Message != null && updatedUserResponse.Message.Contains("already exists"))
+                {
+                     return Conflict(new { message = updatedUserResponse.Message });
+                }
+                if (updatedUserResponse.Message != null && updatedUserResponse.Message.Contains("not found"))
+                {
+                    return NotFound(new { message = updatedUserResponse.Message });
+                }
+                return BadRequest(new { message = updatedUserResponse.Message ?? $"Error updating user with ID {id}" });
             }
 
             return Ok(updatedUserResponse.Data);

@@ -88,6 +88,8 @@ namespace Stayvelle.Query
         public List<string>? Images { get; set; } // List of base64 strings or image URLs
         // If null: preserves existing images
         // If provided: updates images (empty list = remove all images)
+        
+        public string ModifiedBy { get; set; } = string.Empty;
     }
 }
 

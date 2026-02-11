@@ -17,14 +17,14 @@ namespace Stayvelle.RepositoryImpl
         }
 
         // Create
-        public async Task<Response<RoomModel>> CreateRoomAsync(RoomModel room)
+        public async Task<Response<RoomModel>> CreateRoomAsync(CreateRoomDTO createRoomDTO)
         {
             Response<RoomModel> response = new Response<RoomModel>();
             try
             {
                 // Check if room number already exists
                 var existingRoom = await _context.RoomModel
-                    .FirstOrDefaultAsync(r => r.RoomNumber == room.RoomNumber);
+                    .FirstOrDefaultAsync(r => r.RoomNumber == createRoomDTO.RoomNumber);
                 
                 if (existingRoom != null)
                 {
@@ -35,25 +35,37 @@ namespace Stayvelle.RepositoryImpl
                 }
 
                 // Convert Images list to JSON string if provided
-                // Images should come as JSON string from controller, but handle both cases
-                if (room.Images != null && !string.IsNullOrEmpty(room.Images))
+                string? imagesJson = null;
+                if (createRoomDTO.Images != null && createRoomDTO.Images.Count > 0)
                 {
-                    // Validate it's valid JSON array, if not, try to fix it
-                    try
+                    // Filter out any null or empty strings
+                    var validImages = createRoomDTO.Images.Where(img => !string.IsNullOrWhiteSpace(img)).ToList();
+                    if (validImages.Any())
                     {
-                        var imagesList = JsonSerializer.Deserialize<List<string>>(room.Images);
-                        if (imagesList == null || !imagesList.Any())
-                        {
-                            room.Images = null;
-                        }
-                    }
-                    catch
-                    {
-                        // If not valid JSON array, assume it's a single image string and wrap it in array
-                        var imageList = new List<string> { room.Images };
-                        room.Images = JsonSerializer.Serialize(imageList);
+                        imagesJson = JsonSerializer.Serialize(validImages);
                     }
                 }
+
+                var room = new RoomModel
+                {
+                    RoomNumber = createRoomDTO.RoomNumber,
+                    Price = createRoomDTO.Price,
+                    MaxOccupancy = createRoomDTO.MaxOccupancy,
+                    Floor = createRoomDTO.Floor,
+                    NumberOfBeds = createRoomDTO.NumberOfBeds,
+                    ACType = createRoomDTO.AcType,
+                    BathroomType = createRoomDTO.BathroomType,
+                    RoomStatus = createRoomDTO.RoomStatus,
+                    RoomType = createRoomDTO.RoomType,
+                    IsActive = createRoomDTO.IsActive,
+                    Description = createRoomDTO.Description,
+                    IsTv = createRoomDTO.IsTv,
+                    Images = imagesJson,
+                    CreatedBy = createRoomDTO.CreatedBy,
+                    CreatedOn = createRoomDTO.CreatedOn,
+                    ModifiedBy = createRoomDTO.ModifiedBy,
+                    ModifiedOn = createRoomDTO.ModifiedOn
+                };
 
                 _context.RoomModel.Add(room);
                 await _context.SaveChangesAsync();
@@ -201,7 +213,7 @@ namespace Stayvelle.RepositoryImpl
         }
 
         // Update
-        public async Task<Response<RoomModel?>> UpdateRoomAsync(int id, RoomModel room)
+        public async Task<Response<RoomModel?>> UpdateRoomAsync(int id, UpdateRoomDTO updateRoomDTO)
         {
             var response = new Response<RoomModel?>();
             try
@@ -219,9 +231,9 @@ namespace Stayvelle.RepositoryImpl
                 var existingRoom = existingRoomResponse.Data;
 
                 // Check if room number is being changed and already exists
-                if (!string.IsNullOrEmpty(room.RoomNumber) && room.RoomNumber != existingRoom.RoomNumber)
+                if (!string.IsNullOrEmpty(updateRoomDTO.RoomNumber) && updateRoomDTO.RoomNumber != existingRoom.RoomNumber)
                 {
-                    var roomNumberExists = await GetRoomByRoomNumberAsync(room.RoomNumber);
+                    var roomNumberExists = await GetRoomByRoomNumberAsync(updateRoomDTO.RoomNumber);
                     if (roomNumberExists.Success && roomNumberExists.Data != null)
                     {
                         response.Success = false;
@@ -232,43 +244,44 @@ namespace Stayvelle.RepositoryImpl
                 }
 
                 // Update properties
-                existingRoom.RoomNumber = room.RoomNumber ?? existingRoom.RoomNumber;
-                existingRoom.Price = room.Price != 0 ? room.Price : existingRoom.Price;
-                existingRoom.MaxOccupancy = room.MaxOccupancy != 0 ? room.MaxOccupancy : existingRoom.MaxOccupancy;
-                existingRoom.Floor = room.Floor ?? existingRoom.Floor;
-                existingRoom.NumberOfBeds = room.NumberOfBeds ?? existingRoom.NumberOfBeds;
-                existingRoom.AcType = room.AcType ?? existingRoom.AcType;
-                existingRoom.BathroomType = room.BathroomType ?? existingRoom.BathroomType;
-                existingRoom.RoomStatus = room.RoomStatus ?? existingRoom.RoomStatus;
-                existingRoom.RoomType = room.RoomType ?? existingRoom.RoomType;
-                existingRoom.IsActive = room.IsActive;
-                existingRoom.Description = room.Description ?? existingRoom.Description;
-                existingRoom.IsTv = room.IsTv;
+                existingRoom.RoomNumber = updateRoomDTO.RoomNumber ?? existingRoom.RoomNumber;
+                existingRoom.Price = updateRoomDTO.Price ?? existingRoom.Price;
+                existingRoom.MaxOccupancy = updateRoomDTO.MaxOccupancy ?? existingRoom.MaxOccupancy;
+                existingRoom.Floor = updateRoomDTO.Floor ?? existingRoom.Floor;
+                existingRoom.NumberOfBeds = updateRoomDTO.NumberOfBeds ?? existingRoom.NumberOfBeds;
+                existingRoom.ACType = updateRoomDTO.AcType ?? existingRoom.ACType;
+                existingRoom.BathroomType = updateRoomDTO.BathroomType ?? existingRoom.BathroomType;
+                existingRoom.RoomStatus = updateRoomDTO.RoomStatus ?? existingRoom.RoomStatus;
+                existingRoom.RoomType = updateRoomDTO.RoomType ?? existingRoom.RoomType;
+                existingRoom.IsActive = updateRoomDTO.IsActive ?? existingRoom.IsActive;
+                existingRoom.Description = updateRoomDTO.Description ?? existingRoom.Description;
+                existingRoom.IsTv = updateRoomDTO.IsTv ?? existingRoom.IsTv;
                 
                 // Handle Images
-                if (room.Images != null)
+                if (updateRoomDTO.Images != null)
                 {
-                    if (string.IsNullOrWhiteSpace(room.Images))
+                    if (updateRoomDTO.Images.Count > 0)
                     {
-                        existingRoom.Images = null; // Remove images
+                        // Filter out any null or empty strings
+                        var validImages = updateRoomDTO.Images.Where(img => !string.IsNullOrWhiteSpace(img)).ToList();
+                        if (validImages.Any())
+                        {
+                            existingRoom.Images = JsonSerializer.Serialize(validImages);
+                        }
+                        else
+                        {
+                            existingRoom.Images = string.Empty; // All provided images were invalid/empty
+                        }
                     }
                     else
                     {
-                        // Try to parse as JSON, if not valid, serialize it
-                        try
-                        {
-                            JsonSerializer.Deserialize<List<string>>(room.Images);
-                            existingRoom.Images = room.Images; // Already valid JSON
-                        }
-                        catch
-                        {
-                            var imageList = new List<string> { room.Images };
-                            existingRoom.Images = JsonSerializer.Serialize(imageList);
-                        }
+                         existingRoom.Images = string.Empty; // Explicitly passed empty list -> remove logic? 
+                         // DTO comment said "empty list = remove all images"
                     }
                 }
+                // If updateRoomDTO.Images is null, we do nothing and preserve existingRoom.Images
 
-                existingRoom.ModifiedBy = room.ModifiedBy ?? existingRoom.ModifiedBy;
+                existingRoom.ModifiedBy = updateRoomDTO.ModifiedBy;
                 existingRoom.ModifiedOn = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();

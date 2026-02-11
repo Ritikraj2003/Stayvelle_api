@@ -75,7 +75,7 @@ namespace Stayvelle.RepositoryImpl
                     IsActive = user.isactive,
                     IsStaff = user.isstaff,
                     IsAdmin = user.isadmin,
-                    ImageUrl = user.ImageUrl,
+                    //ageUrl = user.ImageUrl,
                     Permissions = permissions.Select(p => new PermissionDTO
                     {
                         Id = p.Id,

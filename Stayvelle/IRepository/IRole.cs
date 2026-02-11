@@ -5,11 +5,11 @@ namespace Stayvelle.IRepository
 {
     public interface IRole
     {
-        Task<Response<RoleModel>> CreateRoleAsync(RoleModel role);
-        Task<Response<List<RoleModel>>> GetAllRolesAsync();
-        Task<Response<RoleModel?>> GetRoleByIdAsync(int id);
-        Task<Response<RoleModel?>> GetRoleByNameAsync(string name);
-        Task<Response<RoleModel?>> UpdateRoleAsync(int id, RoleModel role);
+        Task<Response<RoleResponseDTO>> CreateRoleAsync(CreateRoleDTO createRoleDTO);
+        Task<Response<List<RoleResponseDTO>>> GetAllRolesAsync(string? search = null);
+        Task<Response<RoleResponseDTO?>> GetRoleByIdAsync(int id);
+        Task<Response<RoleResponseDTO?>> GetRoleByNameAsync(string name);
+        Task<Response<RoleResponseDTO?>> UpdateRoleAsync(int id, UpdateRoleDTO updateRoleDTO);
         Task<bool> DeleteRoleAsync(int id);
         Task<bool> SoftDeleteRoleAsync(int id);
     }

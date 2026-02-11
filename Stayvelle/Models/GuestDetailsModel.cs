@@ -1,3 +1,4 @@
+using Stayvelle.Models.DTOs;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
@@ -33,16 +34,11 @@ namespace Stayvelle.Models
         public string? GuestEmail { get; set; }
 
         // Aadhaar / PAN / Passport etc.
-        [MaxLength(50)]
-        public string IdProof { get; set; } = string.Empty;
-
-        // Store file path only (NOT base64) - but we'll store base64 for now
-        public string? IdProofImagePath { get; set; }
-
+    
         public bool IsPrimary { get; set; }
 
-        // Audit
-        public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
+
+        [NotMapped]
+        public List<DocumentModel> Documents { get; set; } = new();
     }
 }
-

@@ -6,7 +6,7 @@ namespace Stayvelle.IRepository
     public interface IUsers
     {
         // Create
-        Task<Response<UsersModel>> CreateUserAsync(UsersModel user);
+        Task<Response<UsersModel>> CreateUserAsync(CreateUserDTO createUserDTO);
         
         // Read
         Task<Response<List<UsersModel>>> GetAllUsersAsync();
@@ -15,7 +15,7 @@ namespace Stayvelle.IRepository
         Task<UsersModel?> GetUserByUsernameAsync(string username);
         
         // Update
-        Task<Response<UsersModel?>> UpdateUserAsync(int id, UsersModel user);
+        Task<Response<UsersModel?>> UpdateUserAsync(int id, UpdateUserDTO updateUserDTO);
         
         // Delete
         Task<bool> DeleteUserAsync(int id);

@@ -21,6 +21,12 @@ namespace Stayvelle.DB
         public DbSet<GuestDetailsModel> GuestDetailsModel { get; set; }
         public DbSet<HousekeepingTask> HousekeepingTask { get; set; }
         
+        // New Models
+        public DbSet<ServiceModel> ServiceModel { get; set; }
+        public DbSet<BookingServiceModel> BookingServiceModel { get; set; }
+        public DbSet<RoomDiscountModel> RoomDiscountModel { get; set; }
+        public DbSet<DocumentModel> DocumentModel { get; set; }
+        
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

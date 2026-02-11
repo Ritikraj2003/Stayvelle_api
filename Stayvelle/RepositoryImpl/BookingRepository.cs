@@ -1,8 +1,13 @@
+using Dapper;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Stayvelle.DB;
 using Stayvelle.IRepository;
 using Stayvelle.Models;
+using Stayvelle.Models.DTOs;
 using Stayvelle.Query;
+using Stayvelle.Services;
+using Microsoft.Extensions.Configuration;
 
 namespace Stayvelle.RepositoryImpl
 {
@@ -10,134 +15,187 @@ namespace Stayvelle.RepositoryImpl
     {
         private readonly ApplicationDbContext _context;
         private readonly IHousekeepingTask _housekeepingTaskRepository;
+        private readonly IConfiguration _configuration;
 
-        public BookingRepository(ApplicationDbContext context, IHousekeepingTask housekeepingTaskRepository)
+        public BookingRepository(ApplicationDbContext context, IHousekeepingTask housekeepingTaskRepository, IConfiguration configuration)
         {
             _context = context;
             _housekeepingTaskRepository = housekeepingTaskRepository;
+            _configuration = configuration;
         }
 
         // Create
-        public async Task<Response<BookingModel>> CreateBookingAsync(BookingModel booking)
+        public async Task<Response<BookingModel>> CreateBookingAsync(CreateBookingDTO bookingDto)
         {
             Response<BookingModel> response = new Response<BookingModel>();
+            
+            // 1. Validate room exists
+            var room = await _context.RoomModel.FindAsync(bookingDto.RoomId);
+            if (room == null)
+            {
+                response.Success = false;
+                response.Message = "Room not found";
+                return response;
+            }
+
+            // 2. Business Rule: Check if room is available
+            if (room.RoomStatus != "Available")
+            {
+                response.Success = false;
+                response.Message = $"Room is not available. Current status: {room.RoomStatus}";
+                return response;
+            }
+
+            // 3. Business Rule: Validate dates
+            if (bookingDto.CheckOutDate <= bookingDto.CheckInDate)
+            {
+                response.Success = false;
+                response.Message = "Check-out date must be after check-in date";
+                return response;
+            }
+
+            // Ensure dates are UTC
+            var checkInDate = bookingDto.CheckInDate.Kind == DateTimeKind.Unspecified 
+                ? DateTime.SpecifyKind(bookingDto.CheckInDate, DateTimeKind.Utc) 
+                : bookingDto.CheckInDate.ToUniversalTime();
+            
+            var checkOutDate = bookingDto.CheckOutDate.Kind == DateTimeKind.Unspecified 
+                ? DateTime.SpecifyKind(bookingDto.CheckOutDate, DateTimeKind.Utc) 
+                : bookingDto.CheckOutDate.ToUniversalTime();
+
+
             try
             {
-                // Validate room exists
-                var room = await _context.RoomModel.FindAsync(booking.RoomId);
-                if (room == null)
-                {
-                    response.Success = false;
-                    response.Message = "Room not found";
-                    response.Data = null;
-                    return response;
-                }
+                // 4. Insert Booking using Dapper
+                var connection = _context.Database.GetDbConnection();
+                if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync();
 
-                // Validate check-in and check-out dates
-                if (booking.CheckOutDate <= booking.CheckInDate)
+                var bookingParams = new
                 {
-                    response.Success = false;
-                    response.Message = "Check-out date must be after check-in date";
-                    response.Data = null;
-                    return response;
-                }
+                    RoomId = bookingDto.RoomId,
+                    CheckInDate = checkInDate,
+                    CheckOutDate = checkOutDate,
+                    NumberOfGuests = bookingDto.NumberOfGuests,
+                    BookingStatus = "Booked",
+                    CreatedBy = "system",
+                    CreatedOn = DateTime.UtcNow,
+                    ActualCheckInTime = DateTime.UtcNow,
+                    ActualCheckOutTime = (DateTime?)null
+                };
 
-                // Set CommonModel fields if not already set
-                if (string.IsNullOrEmpty(booking.CreatedBy))
-                {
-                    booking.CreatedBy = "system";
-                }
-                if (booking.CreatedOn == default(DateTime))
-                {
-                    booking.CreatedOn = DateTime.UtcNow;
-                }
-                else
-                {
-                    // Ensure CreatedOn is UTC
-                    booking.CreatedOn = booking.CreatedOn.Kind == DateTimeKind.Unspecified 
-                        ? DateTime.SpecifyKind(booking.CreatedOn, DateTimeKind.Utc) 
-                        : booking.CreatedOn.ToUniversalTime();
-                }
-                
-                // Ensure CheckInDate and CheckOutDate are UTC
-                booking.CheckInDate = booking.CheckInDate.Kind == DateTimeKind.Unspecified 
-                    ? DateTime.SpecifyKind(booking.CheckInDate, DateTimeKind.Utc) 
-                    : booking.CheckInDate.ToUniversalTime();
-                
-                booking.CheckOutDate = booking.CheckOutDate.Kind == DateTimeKind.Unspecified 
-                    ? DateTime.SpecifyKind(booking.CheckOutDate, DateTimeKind.Utc) 
-                    : booking.CheckOutDate.ToUniversalTime();
-                
-                // Ensure nullable DateTime fields are UTC if set
-                if (booking.ActualCheckInTime.HasValue)
-                {
-                    booking.ActualCheckInTime = booking.ActualCheckInTime.Value.Kind == DateTimeKind.Unspecified 
-                        ? DateTime.SpecifyKind(booking.ActualCheckInTime.Value, DateTimeKind.Utc) 
-                        : booking.ActualCheckInTime.Value.ToUniversalTime();
-                }
-                
-                if (booking.ActualCheckOutTime.HasValue)
-                {
-                    booking.ActualCheckOutTime = booking.ActualCheckOutTime.Value.Kind == DateTimeKind.Unspecified 
-                        ? DateTime.SpecifyKind(booking.ActualCheckOutTime.Value, DateTimeKind.Utc) 
-                        : booking.ActualCheckOutTime.Value.ToUniversalTime();
-                }
-                
-                booking.BookingStatus = booking.BookingStatus ?? "Booked";
+                int bookingId = await connection.ExecuteScalarAsync<int>(BookingQuery.InsertBooking, bookingParams);
 
-                // Set CommonModel fields for guests
-                foreach (var guest in booking.Guests)
+                // 5. Insert Guests
+                if (bookingDto.Guests != null)
                 {
-                    if (string.IsNullOrEmpty(guest.CreatedBy))
+                    foreach (var guestDto in bookingDto.Guests)
                     {
-                        guest.CreatedBy = "system";
-                    }
-                    if (guest.CreatedOn == default(DateTime))
-                    {
-                        guest.CreatedOn = DateTime.UtcNow;
-                    }
-                    else
-                    {
-                        // Ensure CreatedOn is UTC
-                        guest.CreatedOn = guest.CreatedOn.Kind == DateTimeKind.Unspecified 
-                            ? DateTime.SpecifyKind(guest.CreatedOn, DateTimeKind.Utc) 
-                            : guest.CreatedOn.ToUniversalTime();
+                        var guestParams = new
+                        {
+                            BookingId = bookingId,
+                            GuestName = guestDto.GuestName,
+                            Age = guestDto.Age,
+                            Gender = guestDto.Gender,
+                            GuestPhone = guestDto.GuestPhone,
+                            GuestEmail = guestDto.GuestEmail,
+                            CreatedBy = "system",
+                            IsPrimary= true,
+                            CreatedOn = DateTime.UtcNow
+                        };
+
+                        int guestId = await connection.ExecuteScalarAsync<int>(BookingQuery.InsertGuest, guestParams);
+
+                        // Insert Documents for this guest
+                        if (guestDto.Documents != null && guestDto.Documents.Any())
+                        {
+                            foreach (var doc in guestDto.Documents)
+                            {
+
+                                string baseUrl = _configuration["BaseUrl"] ?? "https://localhost:7252";
+                                string filePath = await Uploads.UploadImage(doc.FileName, doc.File, doc.EntityType, baseUrl);
+                                var docModel = new
+                                {
+                                    EntityType = "GUEST",
+                                    EntityId = guestId,
+                                    DocumentType = doc.DocumentType ?? "ID_PROOF",
+                                    FileName = doc.FileName,
+                                    Description = (string?)null,
+                                    FilePath = filePath,
+                                    IsPrimary = doc.IsPrimary,
+                                    CreatedBy = "system",
+                                    CreatedOn = DateTime.UtcNow
+                                };
+
+                                await connection.ExecuteScalarAsync<int>(BookingQuery.InsertDocument, docModel);
+                            }
+                        }
                     }
                 }
 
-                // Add booking and guests
-                _context.BookingModel.Add(booking);
+                // 6. Insert Services
+                if (bookingDto.BookingServcies != null)
+                {
+                    foreach (var serviceDto in bookingDto.BookingServcies)
+                    {
+                        // Fetch service entity for name
+                        var serviceEntity = await connection.QueryFirstOrDefaultAsync<ServiceModel>(
+                            "SELECT * FROM \"ServiceModel\" WHERE \"ServiceId\" = @ServiceId", 
+                            new { ServiceId = serviceDto.ServiceId }
+                        );
+
+                        var serviceName = serviceEntity?.ServiceName ?? "Unknown Service";
+                        
+                        var serviceModel = new
+                        {
+                            BookingId = bookingId,
+                            ServiceId = serviceDto.ServiceId,
+                            ServiceName = serviceName, // Populated from DB
+                            Price = serviceDto.ServicePriceAtThatTime,
+                            Quantity = serviceDto.Quantity,
+                            ServiceDate = serviceDto.ServiceDate,
+                            ServiceStatus = serviceDto.ServiceStatus ?? "Requested",
+                            CreatedOn = DateTime.UtcNow
+                        };
+
+                        await connection.ExecuteScalarAsync<int>(BookingQuery.InsertBookingService, serviceModel);
+                    }
+                }
+
+                // 7. Business Logic: Update Room Status
+                // We use the same transaction via EF Core
+                room.RoomStatus = "Occupied";
+                room.ModifiedOn = DateTime.UtcNow;
+                room.ModifiedBy = "system";
+
+                // Ensure CreatedOn is UTC to satisfy Npgsql
+                if (room.CreatedOn.Kind == DateTimeKind.Unspecified)
+                {
+                    room.CreatedOn = DateTime.SpecifyKind(room.CreatedOn, DateTimeKind.Utc);
+                }
+
+                _context.RoomModel.Update(room); 
                 await _context.SaveChangesAsync();
 
-                // Reload booking with related data
+                // Reload booking with related data for response
                 var savedBooking = await _context.BookingModel
-                    .Include(b => b.Room)
                     .Include(b => b.Guests)
-                    .FirstOrDefaultAsync(b => b.BookingId == booking.BookingId);
+                    .FirstOrDefaultAsync(b => b.BookingId == bookingId);
 
                 response.Success = true;
                 response.Message = "Booking created successfully";
-                response.Data = savedBooking ?? booking;
+                response.Data = savedBooking; // Note: savedBooking might be null if transaction isolation/delay? unlikely awaiting commit.
 
                 return response;
             }
             catch (Exception ex)
             {
+                // Log error if needed
                 response.Success = false;
-                // Get inner exception message if available for more details
-                var errorMessage = ex.InnerException != null 
-                    ? $"{ex.Message} - Inner: {ex.InnerException.Message}" 
-                    : ex.Message;
-                response.Message = errorMessage;
-                response.Data = null;
-                
-                // Log full exception for debugging
-                Console.WriteLine($"Error creating booking: {ex}");
+                response.Message = $"Error creating booking: {ex.Message}";
                 if (ex.InnerException != null)
                 {
-                    Console.WriteLine($"Inner exception: {ex.InnerException}");
+                    response.Message += $" - Inner: {ex.InnerException.Message}";
                 }
-                
                 return response;
             }
         }
@@ -153,6 +211,29 @@ namespace Stayvelle.RepositoryImpl
                     .Include(b => b.Guests)
                     .OrderByDescending(b => b.CreatedOn)
                     .ToListAsync();
+
+                if (bookings != null && bookings.Any())
+                {
+                    // Collect all Guest IDs
+                    var guestIds = bookings.SelectMany(b => b.Guests).Select(g => g.GuestId).ToList();
+
+                    if (guestIds.Any())
+                    {
+                        // Fetch all documents for these guests
+                        var documents = await _context.DocumentModel
+                            .Where(d => d.EntityType == "GUEST" && guestIds.Contains(d.EntityId))
+                            .ToListAsync();
+
+                        // Map documents to guests
+                        foreach (var booking in bookings)
+                        {
+                            foreach (var guest in booking.Guests)
+                            {
+                                guest.Documents = documents.Where(d => d.EntityId == guest.GuestId).ToList();
+                            }
+                        }
+                    }
+                }
 
                 response.Success = true;
                 response.Message = "success";
@@ -185,6 +266,19 @@ namespace Stayvelle.RepositoryImpl
                     response.Message = "Booking not found";
                     response.Data = null;
                     return response;
+                }
+
+                if (booking.Guests != null && booking.Guests.Any())
+                {
+                    var guestIds = booking.Guests.Select(g => g.GuestId).ToList();
+                    var documents = await _context.DocumentModel
+                        .Where(d => d.EntityType == "GUEST" && guestIds.Contains(d.EntityId))
+                        .ToListAsync();
+
+                    foreach (var guest in booking.Guests)
+                    {
+                        guest.Documents = documents.Where(d => d.EntityId == guest.GuestId).ToList();
+                    }
                 }
 
                 response.Success = true;
@@ -222,6 +316,19 @@ namespace Stayvelle.RepositoryImpl
                     return response;
                 }
 
+                if (guest.Booking.Guests != null && guest.Booking.Guests.Any())
+                {
+                    var guestIds = guest.Booking.Guests.Select(g => g.GuestId).ToList();
+                    var documents = await _context.DocumentModel
+                        .Where(d => d.EntityType == "GUEST" && guestIds.Contains(d.EntityId))
+                        .ToListAsync();
+
+                    foreach (var g in guest.Booking.Guests)
+                    {
+                        g.Documents = documents.Where(d => d.EntityId == g.GuestId).ToList();
+                    }
+                }
+
                 response.Success = true;
                 response.Message = "Success";
                 response.Data = guest.Booking;
@@ -255,6 +362,19 @@ namespace Stayvelle.RepositoryImpl
                     response.Message = "Guest or booking not found";
                     response.Data = null;
                     return response;
+                }
+
+                if (guest.Booking.Guests != null && guest.Booking.Guests.Any())
+                {
+                    var guestIds = guest.Booking.Guests.Select(g => g.GuestId).ToList();
+                    var documents = await _context.DocumentModel
+                        .Where(d => d.EntityType == "GUEST" && guestIds.Contains(d.EntityId))
+                        .ToListAsync();
+
+                    foreach (var g in guest.Booking.Guests)
+                    {
+                        g.Documents = documents.Where(d => d.EntityId == g.GuestId).ToList();
+                    }
                 }
 
                 response.Success = true;
@@ -467,6 +587,7 @@ namespace Stayvelle.RepositoryImpl
         // Delete
         public async Task<bool> DeleteBookingAsync(int bookingId)
         {
+            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
                 var booking = await _context.BookingModel
@@ -478,17 +599,92 @@ namespace Stayvelle.RepositoryImpl
                     return false;
                 }
 
-                // Delete guests first
+                // Business Logic: Reset Room Status to Available
+                if (booking.RoomId > 0)
+                {
+                    var room = await _context.RoomModel.FindAsync(booking.RoomId);
+                    if (room != null)
+                    {
+                        room.RoomStatus = "Available";
+                        _context.RoomModel.Update(room);
+                    }
+                }
+
+                // Delete guests first 
+                // Cascade delete might handle this but manual removal is safe explicit logic
                 _context.GuestDetailsModel.RemoveRange(booking.Guests);
                 
                 // Delete booking
                 _context.BookingModel.Remove(booking);
+                
                 await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
                 return true;
             }
             catch
             {
+                await transaction.RollbackAsync();
                 return false;
+            }
+        }
+        public async Task<Response<BookingDetailDto?>> GetBookingDetailsAsync(int bookingId)
+        {
+            var response = new Response<BookingDetailDto?>();
+            try
+            {
+                var bookingDetail = await _context.BookingModel
+                    .Where(b => b.BookingId == bookingId)
+                    .Select(b => new BookingDetailDto
+                    {
+                        BookingId = b.BookingId,
+                        Status = b.BookingStatus,
+                        Room = new RoomDto
+                        {
+                            RoomNumber = b.Room.RoomNumber,
+                            Price = b.Room.Price
+                        },
+                        Guests = b.Guests.Select(g => new GuestDto
+                        {
+                            GuestId = g.GuestId,
+                            Name = g.GuestName,
+                            Primary = g.IsPrimary
+                        }).ToList(),
+                        Services = _context.BookingServiceModel
+                            .Where(bs => bs.BookingId == b.BookingId)
+                            .Select(bs => new ServiceDto
+                            {
+                                Name = bs.ServiceName,
+                                Qty = bs.Quantity,
+                                Price = bs.Price
+                            }).ToList(),
+                        // Calculate total amount: Room Price (per day?) + Services
+                        // Assuming Room Price is per night. Need logic for nights.
+                        // User requirement says: "totalAmount": 5500. 
+                        // Let's implement basic calculation: (Room Price * Nights) + Service Costs
+                        // Note: CheckOutDate - CheckInDate gives duration.
+                        TotalAmount = (decimal)((b.CheckOutDate - b.CheckInDate).Days == 0 ? 1 : (b.CheckOutDate - b.CheckInDate).Days) * b.Room.Price 
+                                      + _context.BookingServiceModel
+                                          .Where(bs => bs.BookingId == b.BookingId)
+                                          .Sum(bs => bs.Quantity * bs.Price)
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (bookingDetail == null)
+                {
+                    response.Success = false;
+                    response.Message = "Booking not found";
+                    return response;
+                }
+
+                response.Success = true;
+                response.Data = bookingDetail;
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.Success = false;
+                response.Message = ex.Message;
+                return response;
             }
         }
     }

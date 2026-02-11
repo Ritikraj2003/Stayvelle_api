@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Npgsql;
@@ -104,6 +105,8 @@ builder.Services.AddScoped<IRolePermission, RolePermissionRepository>();
 builder.Services.AddScoped<IRoom, RoomRepository>();
 builder.Services.AddScoped<IHousekeepingTask, HousekeepingTaskRepository>();
 builder.Services.AddScoped<IBooking, BookingRepository>();
+builder.Services.AddScoped<IDocument, DocumentRepository>();
+builder.Services.AddScoped<IMasterServices, MasterServciesRepository>();
 
 builder.Services.AddCors(options =>
 {
@@ -195,7 +198,16 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
 app.UseCors("AllowAll");
+
+// Serve static files from Uploads directory
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(builder.Environment.ContentRootPath, "Uploads")),
+    RequestPath = "/Uploads"
+});
 
 // Authentication & Authorization middleware (order matters!)
 app.UseAuthentication();
