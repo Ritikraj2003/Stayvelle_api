@@ -80,7 +80,8 @@ namespace Stayvelle.RepositoryImpl
                     CreatedBy = "system",
                     CreatedOn = DateTime.UtcNow,
                     ActualCheckInTime = DateTime.UtcNow,
-                    ActualCheckOutTime = (DateTime?)null
+                    ActualCheckOutTime = (DateTime?)null,
+                    RoomNumber = room.RoomNumber ?? bookingDto.RoomNumber 
                 };
 
                 int bookingId = await connection.ExecuteScalarAsync<int>(BookingQuery.InsertBooking, bookingParams);
@@ -380,6 +381,54 @@ namespace Stayvelle.RepositoryImpl
                 response.Success = true;
                 response.Message = "Success";
                 response.Data = guest.Booking;
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.Success = false;
+                response.Message = ex.Message;
+                response.Data = null;
+                return response;
+            }
+        }
+
+        // Read - Get Booking By Room
+        public async Task<Response<BookingModel?>> GetBookingByRoomAsync(int roomId, string roomNumber)
+        {
+            var response = new Response<BookingModel?>();
+            try
+            {
+                var booking = await _context.BookingModel
+                    .Include(b => b.Room)
+                    .Include(b => b.Guests)
+                    .Where(b => b.RoomId == roomId && b.RoomNumber == roomNumber)
+                    .OrderByDescending(b => b.CreatedOn)
+                    .FirstOrDefaultAsync();
+
+                if (booking == null)
+                {
+                    response.Success = false;
+                    response.Message = "Booking not found using RoomId and RoomNumber";
+                    response.Data = null;
+                    return response;
+                }
+
+                if (booking.Guests != null && booking.Guests.Any())
+                {
+                    var guestIds = booking.Guests.Select(g => g.GuestId).ToList();
+                    var documents = await _context.DocumentModel
+                        .Where(d => d.EntityType == "GUEST" && guestIds.Contains(d.EntityId))
+                        .ToListAsync();
+
+                    foreach (var g in booking.Guests)
+                    {
+                        g.Documents = documents.Where(d => d.EntityId == g.GuestId).ToList();
+                    }
+                }
+
+                response.Success = true;
+                response.Message = "Success";
+                response.Data = booking;
                 return response;
             }
             catch (Exception ex)

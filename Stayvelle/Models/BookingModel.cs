@@ -11,6 +11,7 @@ namespace Stayvelle.Models
         public RoomModel? Room { get; set; }
         public DateTime CheckInDate { get; set; }
         public DateTime CheckOutDate { get; set; }
+        public string? RoomNumber { get; set; } // Snapshot of room number at time of booking
         public DateTime? ActualCheckInTime { get; set; }   // timer start
         public DateTime? ActualCheckOutTime { get; set; }  // timer stop
         public int NumberOfGuests { get; set; }

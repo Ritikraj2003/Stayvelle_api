@@ -2,18 +2,22 @@ using Microsoft.EntityFrameworkCore;
 using Stayvelle.DB;
 using Stayvelle.IRepository;
 using Stayvelle.Models;
+using Stayvelle.Models.DTOs;
 using Stayvelle.Query;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 
 namespace Stayvelle.RepositoryImpl
 {
     public class RoomRepository : IRoom
     {
         private readonly ApplicationDbContext _context;
+        private readonly IConfiguration _configuration;
 
-        public RoomRepository(ApplicationDbContext context)
+        public RoomRepository(ApplicationDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
         }
 
         // Create
@@ -35,16 +39,16 @@ namespace Stayvelle.RepositoryImpl
                 }
 
                 // Convert Images list to JSON string if provided
-                string? imagesJson = null;
-                if (createRoomDTO.Images != null && createRoomDTO.Images.Count > 0)
-                {
-                    // Filter out any null or empty strings
-                    var validImages = createRoomDTO.Images.Where(img => !string.IsNullOrWhiteSpace(img)).ToList();
-                    if (validImages.Any())
-                    {
-                        imagesJson = JsonSerializer.Serialize(validImages);
-                    }
-                }
+                //string? imagesJson = null;
+                //if (createRoomDTO.Images != null && createRoomDTO.Images.Count > 0)
+                //{
+                //    // Filter out any null or empty strings
+                //    var validImages = createRoomDTO.Images.Where(img => !string.IsNullOrWhiteSpace(img)).ToList();
+                //    if (validImages.Any())
+                //    {
+                //        imagesJson = JsonSerializer.Serialize(validImages);
+                //    }
+                //}
 
                 var room = new RoomModel
                 {
@@ -60,7 +64,7 @@ namespace Stayvelle.RepositoryImpl
                     IsActive = createRoomDTO.IsActive,
                     Description = createRoomDTO.Description,
                     IsTv = createRoomDTO.IsTv,
-                    Images = imagesJson,
+                   
                     CreatedBy = createRoomDTO.CreatedBy,
                     CreatedOn = createRoomDTO.CreatedOn,
                     ModifiedBy = createRoomDTO.ModifiedBy,
@@ -69,6 +73,56 @@ namespace Stayvelle.RepositoryImpl
 
                 _context.RoomModel.Add(room);
                 await _context.SaveChangesAsync();
+
+                // Handle Documents
+                if (createRoomDTO.Documents != null && createRoomDTO.Documents.Any())
+                {
+                    string baseUrl = _configuration["BaseUrl"] ?? "https://localhost:7252";
+                    foreach (var doc in createRoomDTO.Documents)
+                    {
+                        if (doc.File != null && doc.File.Length > 0)
+                        {
+                            string filePath = await Stayvelle.Services.Uploads.UploadImage(doc.FileName, doc.File, "RoomDocuments", baseUrl);
+                            
+                            var document = new DocumentModel
+                            {
+                                EntityType = "ROOM",
+                                EntityId = room.Id,
+                                DocumentType = doc.DocumentType ?? "ROOM_IMAGE",
+                                FileName = doc.FileName,
+                                Description = doc.Description,
+                                FilePath = filePath,
+                                IsPrimary = doc.IsPrimary,
+                                CreatedBy = createRoomDTO.CreatedBy,
+                                CreatedOn = DateTime.UtcNow,
+                                ModifiedOn = DateTime.UtcNow
+                            };
+                            
+                            _context.DocumentModel.Add(document);
+                        }
+                    }
+                    await _context.SaveChangesAsync();
+                }
+
+                // Reload room with documents if needed, or just assign to response properties if using DTOs
+                // But RoomModel has [NotMapped] Documents List<DocumentDto>
+                // We should populate it for the response
+
+                var savedDocuments = await _context.DocumentModel
+                    .Where(d => d.EntityType == "ROOM" && d.EntityId == room.Id)
+                    .Select(d => new DocumentDto
+                    {
+                        DocumentId = d.DocumentId,
+                        EntityType = d.EntityType,
+                        EntityId = d.EntityId,
+                        DocumentType = d.DocumentType,
+                        FileName = d.FileName,
+                        Description = d.Description,
+                        FilePath = d.FilePath,
+                        IsPrimary = d.IsPrimary
+                    }).ToListAsync();
+
+                room.Documents = savedDocuments;
 
                 response.Success = true;
                 response.Message = "Room created successfully";
@@ -95,6 +149,32 @@ namespace Stayvelle.RepositoryImpl
                     .OrderBy(r => r.RoomNumber)
                     .ToListAsync();
                 
+                // Populate Documents
+                if (rooms.Any())
+                {
+                    var roomIds = rooms.Select(r => r.Id).ToList();
+                    var documents = await _context.DocumentModel
+                        .Where(d => d.EntityType == "ROOM" && roomIds.Contains(d.EntityId))
+                        .ToListAsync();
+
+                    foreach (var room in rooms)
+                    {
+                        room.Documents = documents
+                            .Where(d => d.EntityId == room.Id)
+                            .Select(d => new DocumentDto
+                            {
+                                DocumentId = d.DocumentId,
+                                EntityType = d.EntityType,
+                                EntityId = d.EntityId,
+                                DocumentType = d.DocumentType,
+                                FileName = d.FileName,
+                                Description = d.Description,
+                                FilePath = d.FilePath,
+                                IsPrimary = d.IsPrimary
+                            }).ToList();
+                    }
+                }
+
                 response.Success = true;
                 response.Message = "success";
                 response.Data = rooms;
@@ -125,6 +205,23 @@ namespace Stayvelle.RepositoryImpl
                     return response;
                 }
 
+                // Populate Documents
+                var documents = await _context.DocumentModel
+                    .Where(d => d.EntityType == "ROOM" && d.EntityId == room.Id)
+                    .ToListAsync();
+
+                room.Documents = documents.Select(d => new DocumentDto
+                {
+                    DocumentId = d.DocumentId,
+                    EntityType = d.EntityType,
+                    EntityId = d.EntityId,
+                    DocumentType = d.DocumentType,
+                    FileName = d.FileName,
+                    Description = d.Description,
+                    FilePath = d.FilePath,
+                    IsPrimary = d.IsPrimary
+                }).ToList();
+
                 response.Success = true;
                 response.Message = "Success";
                 response.Data = room;
@@ -147,6 +244,26 @@ namespace Stayvelle.RepositoryImpl
             {
                 var room = await _context.RoomModel
                     .FirstOrDefaultAsync(r => r.RoomNumber == roomNumber);
+
+                if (room != null)
+                {
+                    // Populate Documents
+                    var documents = await _context.DocumentModel
+                        .Where(d => d.EntityType == "ROOM" && d.EntityId == room.Id)
+                        .ToListAsync();
+
+                    room.Documents = documents.Select(d => new DocumentDto
+                    {
+                        DocumentId = d.DocumentId,
+                        EntityType = d.EntityType,
+                        EntityId = d.EntityId,
+                        DocumentType = d.DocumentType,
+                        FileName = d.FileName,
+                        Description = d.Description,
+                        FilePath = d.FilePath,
+                        IsPrimary = d.IsPrimary
+                    }).ToList();
+                }
 
                 response.Success = room != null;
                 response.Message = room != null ? "Success" : "Room not found";
@@ -173,6 +290,32 @@ namespace Stayvelle.RepositoryImpl
                     .OrderBy(r => r.RoomNumber)
                     .ToListAsync();
 
+                // Populate Documents
+                if (rooms.Any())
+                {
+                    var roomIds = rooms.Select(r => r.Id).ToList();
+                    var documents = await _context.DocumentModel
+                        .Where(d => d.EntityType == "ROOM" && roomIds.Contains(d.EntityId))
+                        .ToListAsync();
+
+                    foreach (var room in rooms)
+                    {
+                        room.Documents = documents
+                            .Where(d => d.EntityId == room.Id)
+                            .Select(d => new DocumentDto
+                            {
+                                DocumentId = d.DocumentId,
+                                EntityType = d.EntityType,
+                                EntityId = d.EntityId,
+                                DocumentType = d.DocumentType,
+                                FileName = d.FileName,
+                                Description = d.Description,
+                                FilePath = d.FilePath,
+                                IsPrimary = d.IsPrimary
+                            }).ToList();
+                    }
+                }
+
                 response.Success = true;
                 response.Message = "Success";
                 response.Data = rooms;
@@ -197,6 +340,32 @@ namespace Stayvelle.RepositoryImpl
                     .Where(r => r.RoomType == roomType)
                     .OrderBy(r => r.RoomNumber)
                     .ToListAsync();
+
+                // Populate Documents
+                if (rooms.Any())
+                {
+                    var roomIds = rooms.Select(r => r.Id).ToList();
+                    var documents = await _context.DocumentModel
+                        .Where(d => d.EntityType == "ROOM" && roomIds.Contains(d.EntityId))
+                        .ToListAsync();
+
+                    foreach (var room in rooms)
+                    {
+                        room.Documents = documents
+                            .Where(d => d.EntityId == room.Id)
+                            .Select(d => new DocumentDto
+                            {
+                                DocumentId = d.DocumentId,
+                                EntityType = d.EntityType,
+                                EntityId = d.EntityId,
+                                DocumentType = d.DocumentType,
+                                FileName = d.FileName,
+                                Description = d.Description,
+                                FilePath = d.FilePath,
+                                IsPrimary = d.IsPrimary
+                            }).ToList();
+                    }
+                }
 
                 response.Success = true;
                 response.Message = "Success";
@@ -257,34 +426,80 @@ namespace Stayvelle.RepositoryImpl
                 existingRoom.Description = updateRoomDTO.Description ?? existingRoom.Description;
                 existingRoom.IsTv = updateRoomDTO.IsTv ?? existingRoom.IsTv;
                 
-                // Handle Images
-                if (updateRoomDTO.Images != null)
+                //// Handle Images
+                //if (updateRoomDTO.Images != null)
+                //{
+                //    if (updateRoomDTO.Images.Count > 0)
+                //    {
+                //        // Filter out any null or empty strings
+                //        var validImages = updateRoomDTO.Images.Where(img => !string.IsNullOrWhiteSpace(img)).ToList();
+                //        if (validImages.Any())
+                //        {
+                //            existingRoom.Images = JsonSerializer.Serialize(validImages);
+                //        }
+                //        else
+                //        {
+                //            existingRoom.Images = string.Empty; // All provided images were invalid/empty
+                //        }
+                //    }
+                //    else
+                //    {
+                //         existingRoom.Images = string.Empty; // Explicitly passed empty list -> remove logic? 
+                //         // DTO comment said "empty list = remove all images"
+                //    }
+                //}
+                //// If updateRoomDTO.Images is null, we do nothing and preserve existingRoom.Images
+
+                // Handle Documents - Append new documents
+                if (updateRoomDTO.Documents != null && updateRoomDTO.Documents.Any())
                 {
-                    if (updateRoomDTO.Images.Count > 0)
+                    string baseUrl = _configuration["BaseUrl"] ?? "https://localhost:7252";
+                    foreach (var doc in updateRoomDTO.Documents)
                     {
-                        // Filter out any null or empty strings
-                        var validImages = updateRoomDTO.Images.Where(img => !string.IsNullOrWhiteSpace(img)).ToList();
-                        if (validImages.Any())
+                        if (doc.File != null && doc.File.Length > 0)
                         {
-                            existingRoom.Images = JsonSerializer.Serialize(validImages);
+                            string filePath = await Stayvelle.Services.Uploads.UploadImage(doc.FileName, doc.File, "RoomDocuments", baseUrl);
+                            
+                            var document = new DocumentModel
+                            {
+                                EntityType = "ROOM",
+                                EntityId = existingRoom.Id,
+                                DocumentType = doc.DocumentType ?? "ROOM_IMAGE",
+                                FileName = doc.FileName,
+                                Description = doc.Description,
+                                FilePath = filePath,
+                                IsPrimary = doc.IsPrimary,
+                                CreatedBy = updateRoomDTO.ModifiedBy,
+                                CreatedOn = DateTime.UtcNow,
+                                ModifiedOn = DateTime.UtcNow
+                            };
+                            
+                            _context.DocumentModel.Add(document);
                         }
-                        else
-                        {
-                            existingRoom.Images = string.Empty; // All provided images were invalid/empty
-                        }
-                    }
-                    else
-                    {
-                         existingRoom.Images = string.Empty; // Explicitly passed empty list -> remove logic? 
-                         // DTO comment said "empty list = remove all images"
                     }
                 }
-                // If updateRoomDTO.Images is null, we do nothing and preserve existingRoom.Images
 
                 existingRoom.ModifiedBy = updateRoomDTO.ModifiedBy;
                 existingRoom.ModifiedOn = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
+
+                // Populate documents for response
+                var savedDocuments = await _context.DocumentModel
+                    .Where(d => d.EntityType == "ROOM" && d.EntityId == existingRoom.Id)
+                    .Select(d => new DocumentDto
+                    {
+                        DocumentId = d.DocumentId,
+                        EntityType = d.EntityType,
+                        EntityId = d.EntityId,
+                        DocumentType = d.DocumentType,
+                        FileName = d.FileName,
+                        Description = d.Description,
+                        FilePath = d.FilePath,
+                        IsPrimary = d.IsPrimary
+                    }).ToListAsync();
+
+                existingRoom.Documents = savedDocuments;
 
                 response.Success = true;
                 response.Message = "Room updated successfully";

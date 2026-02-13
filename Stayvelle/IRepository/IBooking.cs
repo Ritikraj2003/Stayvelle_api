@@ -14,6 +14,7 @@ namespace Stayvelle.IRepository
         Task<Response<BookingModel?>> GetBookingByIdAsync(int bookingId);
         Task<Response<BookingModel?>> GetBookingByGuestIdAsync(int guestId);
         Task<Response<BookingModel?>> GetBookingByGuestPhoneAsync(string phoneNumber);
+        Task<Response<BookingModel?>> GetBookingByRoomAsync(int roomId, string roomNumber);
 
         // Update
         Task<Response<BookingModel?>> UpdateBookingAsync(int bookingId, BookingModel booking);

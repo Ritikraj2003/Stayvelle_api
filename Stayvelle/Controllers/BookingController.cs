@@ -35,9 +35,9 @@ namespace Stayvelle.Controllers
 
         // GET: api/Booking/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<BookingDetailDto>> GetBooking(int id)
+        public async Task<ActionResult<BookingModel>> GetBooking(int id)
         {
-            var response = await _bookingRepository.GetBookingDetailsAsync(id);
+            var response = await _bookingRepository.GetBookingByIdAsync(id);
             if (!response.Success || response.Data == null)
             {
                 return NotFound(new { message = response.Message ?? $"Booking with ID {id} not found" });
@@ -65,6 +65,18 @@ namespace Stayvelle.Controllers
             if (!response.Success || response.Data == null)
             {
                 return NotFound(new { message = response.Message ?? $"Booking for phone number {phoneNumber} not found" });
+            }
+            return Ok(response.Data);
+        }
+
+        // GET: api/Booking/room/{roomId}/{roomNumber}
+        [HttpGet("room/{roomId}/{roomNumber}")]
+        public async Task<ActionResult<BookingModel>> GetBookingByRoom(int roomId, string roomNumber)
+        {
+            var response = await _bookingRepository.GetBookingByRoomAsync(roomId, roomNumber);
+            if (!response.Success || response.Data == null)
+            {
+                return NotFound(new { message = response.Message ?? $"Booking for Room ID {roomId} and Number {roomNumber} not found" });
             }
             return Ok(response.Data);
         }

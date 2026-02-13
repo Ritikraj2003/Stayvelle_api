@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Stayvelle.Models.DTOs;
 
 namespace Stayvelle.Models
 {
@@ -16,7 +17,7 @@ namespace Stayvelle.Models
         public bool IsActive { get; set; }
 
         [NotMapped]
-        public List<DocumentModel> Documents { get; set; } = new();
+        public List<DocumentDto> Documents { get; set; } = new();
 
     }
 

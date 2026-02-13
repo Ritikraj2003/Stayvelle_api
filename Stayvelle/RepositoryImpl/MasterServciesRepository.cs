@@ -29,7 +29,7 @@ namespace Stayvelle.RepositoryImpl
                 // Fetch images for all services
                 var serviceIds = services.Select(s => s.ServiceId).ToList();
                 var imageDocs = await _context.DocumentModel
-                    .Where(d => d.EntityType == "SERVICE" && serviceIds.Contains(d.EntityId) && d.IsPrimary)
+                    .Where(d => d.EntityType == "SERVICE" && serviceIds.Contains(d.EntityId))
                     .ToListAsync();
 
                 var dtos = services.Select(s => new ServiceResponseDto
@@ -46,7 +46,19 @@ namespace Stayvelle.RepositoryImpl
                     CreatedOn = s.CreatedOn,
                     ModifiedBy = s.ModifiedBy,
                     ModifiedOn = s.ModifiedOn,
-                    ImagePath = imageDocs.FirstOrDefault(d => d.EntityId == s.ServiceId)?.FilePath
+                    Documents = imageDocs
+                        .Where(d => d.EntityId == s.ServiceId)
+                        .Select(d => new DocumentDto
+                        {
+                            DocumentId = d.DocumentId,
+                            EntityType = d.EntityType,
+                            EntityId = d.EntityId,
+                            DocumentType = d.DocumentType,
+                            FileName = d.FileName,
+                            FilePath = d.FilePath,
+                            IsPrimary = d.IsPrimary,
+                            Description = d.Description
+                        }).ToList()
                 }).ToList();
 
                 response.Success = true;
@@ -74,14 +86,15 @@ namespace Stayvelle.RepositoryImpl
                     return response;
                 }
 
-                var imageDoc = await _context.DocumentModel
-                    .FirstOrDefaultAsync(d => d.EntityType == "SERVICE" && d.EntityId == serviceId && d.IsPrimary);
+                var docs = await _context.DocumentModel
+                    .Where(d => d.EntityType == "SERVICE" && d.EntityId == serviceId)
+                    .ToListAsync();
 
                 var dto = new ServiceResponseDto
                 {
                     ServiceId = service.ServiceId,
                     ServiceCategory = service.ServiceCategory,
-                    SubCategory=service.SubCategory,
+                    SubCategory = service.SubCategory,
                     ServiceName = service.ServiceName,
                     Price = service.Price,
                     Unit = service.Unit,
@@ -91,7 +104,17 @@ namespace Stayvelle.RepositoryImpl
                     CreatedOn = service.CreatedOn,
                     ModifiedBy = service.ModifiedBy,
                     ModifiedOn = service.ModifiedOn,
-                    ImagePath = imageDoc?.FilePath
+                    Documents = docs.Select(d => new DocumentDto
+                    {
+                        DocumentId = d.DocumentId,
+                        EntityType = d.EntityType,
+                        EntityId = d.EntityId,
+                        DocumentType = d.DocumentType,
+                        FileName = d.FileName,
+                        FilePath = d.FilePath,
+                        IsPrimary = d.IsPrimary,
+                        Description = d.Description
+                    }).ToList()
                 };
 
                 response.Success = true;
@@ -128,25 +151,50 @@ namespace Stayvelle.RepositoryImpl
                 _context.ServiceModel.Add(service);
                 await _context.SaveChangesAsync();
 
-                if (dto.Image != null)
+                if (dto.Documents != null && dto.Documents.Any())
                 {
                     string baseUrl = _configuration["BaseUrl"] ?? "https://localhost:7252";
-                    string filePath = await Uploads.UploadImage(dto.ServiceName, dto.Image, "SERVICE", baseUrl);
-                    if (!string.IsNullOrEmpty(filePath))
+                    var newDocs = new List<DocumentModel>();
+                    foreach (var docDto in dto.Documents)
                     {
-                        var doc = new DocumentModel
+                        if (docDto.File != null)
                         {
-                            EntityType = "SERVICE",
-                            EntityId = service.ServiceId,
-                            DocumentType = "ServiceImage",
-                            FileName = dto.Image.FileName,
-                            FilePath = filePath,
-                            IsPrimary = true,
-                            CreatedBy = "system",
-                            CreatedOn = DateTime.UtcNow
-                        };
-                        _context.DocumentModel.Add(doc);
+                            string filePath = await Uploads.UploadImage(dto.ServiceName, docDto.File, "SERVICE", baseUrl);
+                            if (!string.IsNullOrEmpty(filePath))
+                            {
+                                var doc = new DocumentModel
+                                {
+                                    EntityType = "SERVICE",
+                                    EntityId = service.ServiceId,
+                                    DocumentType = !string.IsNullOrEmpty(docDto.DocumentType) ? docDto.DocumentType : "ServiceImage",
+                                    FileName = !string.IsNullOrEmpty(docDto.FileName) ? docDto.FileName : docDto.File.FileName,
+                                    FilePath = filePath,
+                                    Description = docDto.Description,
+                                    IsPrimary = docDto.IsPrimary,
+                                    CreatedBy = "system",
+                                    CreatedOn = DateTime.UtcNow
+                                };
+                                newDocs.Add(doc);
+                            }
+                        }
+                    }
+
+                    if (newDocs.Any())
+                    {
+                        _context.DocumentModel.AddRange(newDocs);
                         await _context.SaveChangesAsync();
+
+                        service.Documents = newDocs.Select(d => new DocumentDto
+                        {
+                            DocumentId = d.DocumentId,
+                            EntityType = d.EntityType,
+                            EntityId = d.EntityId,
+                            DocumentType = d.DocumentType,
+                            FileName = d.FileName,
+                            FilePath = d.FilePath,
+                            IsPrimary = d.IsPrimary,
+                            Description = d.Description
+                        }).ToList();
                     }
                 }
 
@@ -192,36 +240,35 @@ namespace Stayvelle.RepositoryImpl
                  _context.ServiceModel.Update(service);
                  await _context.SaveChangesAsync();
 
-                 if (dto.Image != null)
+                 if (dto.Documents != null && dto.Documents.Any())
                  {
-                     var existingDocs = await _context.DocumentModel
-                        .Where(d => d.EntityType == "SERVICE" && d.EntityId == serviceId && d.IsPrimary)
-                        .ToListAsync();
-                     
-                     foreach(var d in existingDocs)
-                     {
-                         d.IsPrimary = false; 
-                         _context.DocumentModel.Update(d);
-                     }
-
                      string baseUrl = _configuration["BaseUrl"] ?? "https://localhost:7252";
-                     string filePath = await Uploads.UploadImage(dto.ServiceName, dto.Image, "SERVICE", baseUrl);
-                     if (!string.IsNullOrEmpty(filePath))
+                     
+                     foreach(var docDto in dto.Documents)
                      {
-                         var doc = new DocumentModel
+                         if (docDto.File != null)
                          {
-                             EntityType = "SERVICE",
-                             EntityId = service.ServiceId,
-                             DocumentType = "ServiceImage",
-                             FileName = dto.Image.FileName,
-                             FilePath = filePath,
-                             IsPrimary = true,
-                             CreatedBy = "system",
-                             CreatedOn = DateTime.UtcNow
-                         };
-                         _context.DocumentModel.Add(doc);
-                         await _context.SaveChangesAsync();
+                             // Use ServiceName for folder, or maybe keep it "SERVICE"? Previous code used service.ServiceName
+                             string filePath = await Uploads.UploadImage(service.ServiceName, docDto.File, "SERVICE", baseUrl);
+                             if (!string.IsNullOrEmpty(filePath))
+                             {
+                                 var doc = new DocumentModel
+                                 {
+                                     EntityType = "SERVICE",
+                                     EntityId = service.ServiceId,
+                                     DocumentType = !string.IsNullOrEmpty(docDto.DocumentType) ? docDto.DocumentType : "ServiceImage",
+                                     FileName = !string.IsNullOrEmpty(docDto.FileName) ? docDto.FileName : docDto.File.FileName,
+                                     FilePath = filePath,
+                                     Description = docDto.Description,
+                                     IsPrimary = docDto.IsPrimary,
+                                     CreatedBy = "system",
+                                     CreatedOn = DateTime.UtcNow
+                                 };
+                                 _context.DocumentModel.Add(doc);
+                             }
+                         }
                      }
+                     await _context.SaveChangesAsync();
                  }
 
                  await transaction.CommitAsync();

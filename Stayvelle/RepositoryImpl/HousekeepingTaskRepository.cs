@@ -145,7 +145,7 @@ namespace Stayvelle.RepositoryImpl
         }
 
         // Read - Get Tasks By Booking Id
-        public async Task<Response<List<HousekeepingTask>>> GetHousekeepingTasksByBookingIdAsync(int bookingId)
+        public async Task<Response<List<HousekeepingTask>>> GetHousekeepingTasksByRoomIdAsync(int roomid)
         {
             var response = new Response<List<HousekeepingTask>>();
             try
@@ -153,7 +153,7 @@ namespace Stayvelle.RepositoryImpl
                 var tasks = await _context.HousekeepingTask
                     //.Include(t => t.Room)
                     //.Include(t => t.Booking)
-                    .Where(t => t.BookingId == bookingId)
+                    .Where(t => t.RoomId == roomid)
                     .OrderByDescending(t => t.CreatedOn)
                     .ToListAsync();
 

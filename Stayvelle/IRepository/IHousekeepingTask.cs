@@ -11,7 +11,7 @@ namespace Stayvelle.IRepository
         // Read
         Task<Response<List<HousekeepingTask>>> GetAllHousekeepingTasksAsync();
         Task<Response<HousekeepingTask?>> GetHousekeepingTaskByIdAsync(int taskId);
-        Task<Response<List<HousekeepingTask>>> GetHousekeepingTasksByBookingIdAsync(int bookingId);
+        Task<Response<List<HousekeepingTask>>> GetHousekeepingTasksByRoomIdAsync(int roomid);
         Task<Response<List<HousekeepingTask>>> GetHousekeepingTasksByUserIdAsync(int userId);
 
         // Update

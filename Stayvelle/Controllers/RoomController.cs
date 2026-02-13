@@ -8,7 +8,7 @@ namespace Stayvelle.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
+    //[Authorize]
     public class RoomController : ControllerBase
     {
         private readonly IRoom _roomRepository;
@@ -84,7 +84,7 @@ namespace Stayvelle.Controllers
 
         // POST: api/Room
         [HttpPost]
-        public async Task<ActionResult<RoomModel>> CreateRoom([FromBody] CreateRoomDTO createRoomDTO)
+        public async Task<ActionResult<RoomModel>> CreateRoom([FromForm] CreateRoomDTO createRoomDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -105,7 +105,7 @@ namespace Stayvelle.Controllers
 
         // PUT: api/Room/5
         [HttpPut("{id}")]
-        public async Task<ActionResult<RoomModel>> UpdateRoom(int id, [FromBody] UpdateRoomDTO updateRoomDTO)
+        public async Task<ActionResult<RoomModel>> UpdateRoom(int id, [FromForm] UpdateRoomDTO updateRoomDTO)
         {
             var updatedRoomResponse = await _roomRepository.UpdateRoomAsync(id, updateRoomDTO);
             if (!updatedRoomResponse.Success || updatedRoomResponse.Data == null)

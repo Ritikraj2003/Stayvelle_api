@@ -42,13 +42,13 @@ namespace Stayvelle.Controllers
         }
 
         // GET: api/HousekeepingTask/booking/5
-        [HttpGet("booking/{bookingId}")]
-        public async Task<ActionResult<List<HousekeepingTask>>> GetHousekeepingTasksByBookingId(int bookingId)
+        [HttpGet("room/{roomid}")]
+        public async Task<ActionResult<List<HousekeepingTask>>> GetHousekeepingTasksByRoomById(int roomid)
         {
-            var response = await _housekeepingTaskRepository.GetHousekeepingTasksByBookingIdAsync(bookingId);
+            var response = await _housekeepingTaskRepository.GetHousekeepingTasksByRoomIdAsync(roomid);
             if (!response.Success || response.Data == null)
             {
-                return NotFound(new { message = response.Message ?? $"No housekeeping tasks found for booking ID {bookingId}" });
+                return NotFound(new { message = response.Message ?? $"No housekeeping tasks found for booking ID {roomid}" });
             }
             return Ok(response.Data);
         }

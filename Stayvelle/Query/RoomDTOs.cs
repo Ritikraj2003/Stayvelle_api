@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Stayvelle.Models;
+using Stayvelle.Models.DTOs;
 
 namespace Stayvelle.Query
 {
@@ -48,7 +49,9 @@ namespace Stayvelle.Query
 
         public bool IsTv { get; set; } = false;
 
-        public List<string>? Images { get; set; } // List of base64 strings or image URLs
+        //public List<string>? Images { get; set; } // List of base64 strings or image URLs
+
+        public List<DocumentDto> Documents { get; set; } = new();
     }
 
     public class UpdateRoomDTO
@@ -85,11 +88,13 @@ namespace Stayvelle.Query
 
         public bool? IsTv { get; set; }
 
-        public List<string>? Images { get; set; } // List of base64 strings or image URLs
+        //public List<string>? Images { get; set; } // List of base64 strings or image URLs
         // If null: preserves existing images
         // If provided: updates images (empty list = remove all images)
         
         public string ModifiedBy { get; set; } = string.Empty;
+
+        public List<DocumentDto>? Documents { get; set; }
     }
 }
 

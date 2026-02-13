@@ -1,4 +1,6 @@
+using Stayvelle.Models.DTOs;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Stayvelle.Models
 {
@@ -19,8 +21,9 @@ namespace Stayvelle.Models
         public string? Description { get; set; }
         public bool IsTv { get; set; } = false;
         
-        // Context: Keeping this to avoid data loss, but new DocumentModel should be used for images.
-        public string? Images { get; set; } 
+        [NotMapped]
+        public List<DocumentDto> Documents { get; set; } = new();
+
     }
 }
 

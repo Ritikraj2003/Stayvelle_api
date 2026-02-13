@@ -11,7 +11,7 @@ namespace Stayvelle.Models.DTOs
         public string Unit { get; set; } = string.Empty;
         public bool IsComplementary { get; set; }
         public bool IsActive { get; set; } = true;
-        public IFormFile? Image { get; set; } // For image upload
+        public List<DocumentDto> Documents { get; set; } = new();
     }
 
     public class UpdateServiceDto
@@ -24,7 +24,7 @@ namespace Stayvelle.Models.DTOs
         public string Unit { get; set; } = string.Empty;
         public bool IsComplementary { get; set; }
         public bool IsActive { get; set; }
-        public IFormFile? Image { get; set; } // For updating image
+        public List<DocumentDto> Documents { get; set; } = new();
     }
 
     public class ServiceResponseDto : ServiceModel
@@ -34,6 +34,6 @@ namespace Stayvelle.Models.DTOs
         // We'll return the document data separately or attach it here.
         // The user wants to store it in DocumentModel.
         // When fetching all services, we might want the image path.
-        public string? ImagePath { get; set; }
+        // Documents inherited from ServiceModel
     }
 }
