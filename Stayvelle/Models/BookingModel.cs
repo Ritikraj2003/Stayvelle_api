@@ -20,7 +20,7 @@ namespace Stayvelle.Models
 
         // Navigation
         public ICollection<GuestDetailsModel> Guests { get; set; } = new List<GuestDetailsModel>();
-        //public ICollection<BookingService> BookingServcies { get; set; } = new List<BookingService>();
+        public ICollection<BookingServiceModel> BookingServices { get; set; } = new List<BookingServiceModel>();
     }
 
     public class BookingServiceDto

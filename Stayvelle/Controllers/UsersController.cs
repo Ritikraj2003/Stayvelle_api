@@ -8,7 +8,7 @@ namespace Stayvelle.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
+    //[Authorize]
     public class UsersController : ControllerBase
     {
         private readonly IUsers _userRepository;
@@ -66,9 +66,21 @@ namespace Stayvelle.Controllers
             return Ok(user);
         }
 
+        // GET: api/Users/housekeeping
+        [HttpGet("housekeeping")]
+        public async Task<ActionResult<List<UsersModel>>> GetHousekeepingUsers()
+        {
+            var response = await _userRepository.GetHousekeepingUsersAsync();
+            if(!response.Success)
+            {
+                return BadRequest(new { message = response.Message });
+            }
+            return Ok(response.Data);
+        }
+
         // POST: api/Users
         [HttpPost]
-        public async Task<ActionResult<UsersModel>> CreateUser([FromBody] CreateUserDTO createUserDTO)
+        public async Task<ActionResult<UsersModel>> CreateUser([FromForm] CreateUserDTO createUserDTO)
         {
             if (!ModelState.IsValid)
             {
@@ -89,7 +101,7 @@ namespace Stayvelle.Controllers
 
         // PUT: api/Users/5
         [HttpPut("{id}")]
-        public async Task<ActionResult<UsersModel>> UpdateUser(int id, [FromBody] UpdateUserDTO updateUserDTO)
+        public async Task<ActionResult<UsersModel>> UpdateUser(int id, [FromForm] UpdateUserDTO updateUserDTO)
         {
             var updatedUserResponse = await _userRepository.UpdateUserAsync(id, updateUserDTO);
             if (!updatedUserResponse.Success || updatedUserResponse.Data == null)

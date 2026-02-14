@@ -91,22 +91,26 @@ namespace Stayvelle.Query
                 ""BookingId"", 
                 ""ServiceId"", 
                 ""ServiceName"",
+                ""ServiceCategory"",
+                ""SubCategory"",
                 ""Price"",
+                ""Unit"",
                 ""Quantity"", 
                 ""ServiceDate"", 
-                ""ServiceStatus"", 
-                ""CreatedOn""
+                ""ServiceStatus""
             ) 
             VALUES 
             (
                 @BookingId, 
                 @ServiceId, 
                 @ServiceName,
+                @ServiceCategory,
+                @SubCategory,
                 @Price,
+                @Unit,
                 @Quantity, 
                 @ServiceDate, 
-                @ServiceStatus, 
-                @CreatedOn
+                @ServiceStatus
             ) 
             RETURNING ""BookingServiceId"";";
     }

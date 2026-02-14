@@ -20,7 +20,7 @@ namespace Stayvelle.Query
         public bool IsActive { get; set; }
         public bool IsStaff { get; set; }
         public bool IsAdmin { get; set; }
-        public string? ImageUrl { get; set; } // User profile image
+        // ImageUrl removed
         public List<PermissionDTO> Permissions { get; set; } = new List<PermissionDTO>();
         public string Token { get; set; } = string.Empty; // Will be implemented with JWT later
     }

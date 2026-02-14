@@ -13,6 +13,7 @@ namespace Stayvelle.IRepository
         Task<Response<UsersModel?>> GetUserByIdAsync(int id);
         Task<Response<UsersModel?>> GetUserByEmailAsync(string email);
         Task<UsersModel?> GetUserByUsernameAsync(string username);
+        Task<Response<List<UsersModel>>> GetHousekeepingUsersAsync();
         
         // Update
         Task<Response<UsersModel?>> UpdateUserAsync(int id, UpdateUserDTO updateUserDTO);

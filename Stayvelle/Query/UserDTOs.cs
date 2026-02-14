@@ -1,10 +1,11 @@
 using Stayvelle.Models;
+using Stayvelle.Models.DTOs;
 
 namespace Stayvelle.Query
 {
     // DTOs for User operations (for API requests/responses)
     
-    public class CreateUserDTO: CommonModel
+    public class CreateUserDTO : CommonModel
     {
         public string Name { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
@@ -16,8 +17,9 @@ namespace Stayvelle.Query
         public int role_id { get; set; }
         public string role_name { get; set; }
         public string Phone { get; set; }
-        public string? ImageUrl { get; set; } // Optional: image as base64 string or file path
-
+        
+        public bool IsHousekeeping { get; set; } = false;
+        public List<DocumentDto> Documents { get; set; } = new();
     }
 
     public class UpdateUserDTO
@@ -32,9 +34,9 @@ namespace Stayvelle.Query
         public bool? isactive { get; set; }
         public bool? isstaff { get; set; }
         public bool? isadmin { get; set; }
-        public string? ImageUrl { get; set; } // Optional: 
-                                              // - If provided (not null): updates image (empty string = remove image)
-                                              // - If null: preserves existing image
+        
+        public bool? IsHousekeeping { get; set; }
+        public List<DocumentDto>? Documents { get; set; }
     }
 }
 

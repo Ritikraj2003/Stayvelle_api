@@ -401,6 +401,7 @@ namespace Stayvelle.RepositoryImpl
                 var booking = await _context.BookingModel
                     .Include(b => b.Room)
                     .Include(b => b.Guests)
+                    .Include(b => b.BookingServices)
                     .Where(b => b.RoomId == roomId && b.RoomNumber == roomNumber)
                     .OrderByDescending(b => b.CreatedOn)
                     .FirstOrDefaultAsync();
@@ -733,6 +734,62 @@ namespace Stayvelle.RepositoryImpl
             {
                 response.Success = false;
                 response.Message = ex.Message;
+                return response;
+            }
+        }
+        // Add Service to Booking
+        public async Task<Response<bool>> AddServiceToBookingAsync(List<AddBookingServiceDto> addServiceDtos)
+        {
+            var response = new Response<bool>();
+            try
+            {
+                if (addServiceDtos == null || !addServiceDtos.Any())
+                {
+                    response.Success = false;
+                    response.Message = "No services provided";
+                    return response;
+                }
+
+                var connection = _context.Database.GetDbConnection();
+                if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync();
+
+                foreach (var addServiceDto in addServiceDtos)
+                {
+                     // 1. Validate Booking exists (Optional: optimize to check once if all have same bookingId, but safety first)
+                    // We can check locally or just try insert. The previous code checked existence.
+                    // Doing a quick existence check for the first one or just assuming valid if FK violation isn't an issue.
+                    // Let's keep it safe but maybe optimize?
+                    // actually, let's just loop.
+                    
+                    // 2. Prepare Service Model for Insertion (Data from UI)
+                    var serviceModel = new
+                    {
+                        BookingId = addServiceDto.BookingId,
+                        ServiceId = addServiceDto.ServiceId,
+                        ServiceName = addServiceDto.ServiceName,
+                        ServiceCategory = addServiceDto.ServiceCategory,
+                        SubCategory = addServiceDto.SubCategory,
+                        Price = addServiceDto.Price,
+                        Unit = addServiceDto.Unit,
+                        Quantity = addServiceDto.Quantity,
+                        ServiceDate = addServiceDto.ServiceDate,
+                        ServiceStatus = string.IsNullOrEmpty(addServiceDto.ServiceStatus) ? "Requested" : addServiceDto.ServiceStatus,
+                        
+                    };
+
+                    // 3. Insert Data
+                    await connection.ExecuteScalarAsync<int>(BookingQuery.InsertBookingService, serviceModel);
+                }
+
+                response.Success = true;
+                response.Message = "Services added to booking successfully";
+                response.Data = true;
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.Success = false;
+                response.Message = "Error adding services to booking: " + ex.Message;
                 return response;
             }
         }

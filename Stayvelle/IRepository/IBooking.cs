@@ -28,6 +28,9 @@ namespace Stayvelle.IRepository
 
         // Delete
         Task<bool> DeleteBookingAsync(int bookingId);
+
+        // Add Service to Booking
+        Task<Response<bool>> AddServiceToBookingAsync(List<AddBookingServiceDto> addServiceDtos);
     }
 }
 

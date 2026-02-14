@@ -178,6 +178,28 @@ namespace Stayvelle.Controllers
 
             return Ok(new { message = $"Booking with ID {id} deleted successfully" });
         }
+        // POST: api/Booking/InsertDataByBookingId
+        [HttpPost("InsertDataByBookingId")]
+        public async Task<ActionResult> InsertDataByBookingId([FromBody] List<AddBookingServiceDto> addServiceDtos)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var response = await _bookingRepository.AddServiceToBookingAsync(addServiceDtos);
+            
+            if (!response.Success)
+            {
+                if (response.Message.Contains("not found"))
+                {
+                    return NotFound(new { message = response.Message });
+                }
+                return BadRequest(new { message = response.Message });
+            }
+
+            return Ok(new { message = response.Message, data = response.Data });
+        }
     }
 }
 

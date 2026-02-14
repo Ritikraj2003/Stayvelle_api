@@ -20,8 +20,7 @@ namespace Stayvelle.Query
                 ""isstaff"" = @isstaff,
                 ""isadmin"" = @isadmin,
                 ""role_id"" = @role_id,
-                ""role_name"" = @role_name,
-                ""ImageUrl"" = @ImageUrl
+                ""role_name"" = @role_name
             WHERE ""Id"" = @Id AND ""isdelete"" = false;";
 
         public static string SoftDeleteUser = @"
