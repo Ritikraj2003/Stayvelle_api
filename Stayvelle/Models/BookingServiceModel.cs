@@ -12,6 +12,8 @@ namespace Stayvelle.Models
         [ForeignKey("BookingId")]
         public BookingModel? Booking { get; set; }
 
+        public int ServiceId { get; set; }
+
         [ForeignKey("ServiceId")]
         public ServiceModel? Service { get; set; }
 

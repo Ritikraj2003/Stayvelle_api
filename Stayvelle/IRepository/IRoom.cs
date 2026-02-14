@@ -1,5 +1,5 @@
 using Stayvelle.Models;
-using Stayvelle.Query;
+using Stayvelle.Models;
 
 namespace Stayvelle.IRepository
 {
@@ -14,6 +14,7 @@ namespace Stayvelle.IRepository
         Task<Response<RoomModel?>> GetRoomByRoomNumberAsync(string roomNumber);
         Task<Response<List<RoomModel>>> GetRoomsByStatusAsync(string status);
         Task<Response<List<RoomModel>>> GetRoomsByTypeAsync(string roomType);
+        Task<Response<RoomModel?>> GetRoomByQrTokenAsync(string token);
 
         // Update
         Task<Response<RoomModel?>> UpdateRoomAsync(int id, UpdateRoomDTO updateRoomDTO);

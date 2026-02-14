@@ -4,8 +4,9 @@ using Npgsql;
 using Stayvelle.DB;
 using Stayvelle.IRepository;
 using Stayvelle.Models;
-using Stayvelle.Models.DTOs;
 using Stayvelle.Query;
+using Stayvelle.Models;
+
 using Stayvelle.Services;
 using Microsoft.Extensions.Configuration;
 
@@ -70,6 +71,14 @@ namespace Stayvelle.RepositoryImpl
                 var connection = _context.Database.GetDbConnection();
                 if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync();
 
+                // Extract phone number from primary guest or first guest for AccessPin
+                string accessPin = "";
+                if (bookingDto.Guests != null && bookingDto.Guests.Any())
+                {
+                    var primaryGuest = bookingDto.Guests.FirstOrDefault(g => g.IsPrimary) ?? bookingDto.Guests.First();
+                    accessPin = primaryGuest.GuestPhone;
+                }
+
                 var bookingParams = new
                 {
                     RoomId = bookingDto.RoomId,
@@ -81,7 +90,8 @@ namespace Stayvelle.RepositoryImpl
                     CreatedOn = DateTime.UtcNow,
                     ActualCheckInTime = DateTime.UtcNow,
                     ActualCheckOutTime = (DateTime?)null,
-                    RoomNumber = room.RoomNumber ?? bookingDto.RoomNumber 
+                    RoomNumber = room.RoomNumber ?? bookingDto.RoomNumber,
+                    AccessPin = accessPin
                 };
 
                 int bookingId = await connection.ExecuteScalarAsync<int>(BookingQuery.InsertBooking, bookingParams);
@@ -175,6 +185,17 @@ namespace Stayvelle.RepositoryImpl
                 }
 
                 _context.RoomModel.Update(room); 
+                
+                // Create Booking Session
+                var bookingSession = new BookingSessionModel
+                {
+                    BookingId = bookingId,
+                    RoomId = bookingDto.RoomId,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.BookingSessionModel.Add(bookingSession);
+                
                 await _context.SaveChangesAsync();
 
                 // Reload booking with related data for response
@@ -596,6 +617,16 @@ namespace Stayvelle.RepositoryImpl
                 {
                     booking.Room.RoomStatus = "Maintenance";
                 }
+                
+                // Deactivate Booking Session
+                var session = await _context.BookingSessionModel
+                    .FirstOrDefaultAsync(s => s.BookingId == bookingId && s.IsActive);
+                
+                if (session != null)
+                {
+                    session.IsActive = false;
+                    _context.BookingSessionModel.Update(session);
+                }
 
                 await _context.SaveChangesAsync();
 
@@ -691,6 +722,7 @@ namespace Stayvelle.RepositoryImpl
                         Room = new RoomDto
                         {
                             RoomNumber = b.Room.RoomNumber,
+                            RoomQrToken = b.Room.RoomQrToken,
                             Price = b.Room.Price
                         },
                         Guests = b.Guests.Select(g => new GuestDto

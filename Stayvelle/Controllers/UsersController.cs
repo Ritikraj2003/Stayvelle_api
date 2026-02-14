@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Stayvelle.IRepository;
 using Stayvelle.Models;
-using Stayvelle.Query;
+
 
 namespace Stayvelle.Controllers
 {

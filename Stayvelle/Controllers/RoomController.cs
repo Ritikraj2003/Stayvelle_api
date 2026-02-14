@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Stayvelle.IRepository;
 using Stayvelle.Models;
-using Stayvelle.Query;
+
 
 namespace Stayvelle.Controllers
 {
@@ -56,6 +56,18 @@ namespace Stayvelle.Controllers
                 return NotFound(new { message = response.Message ?? $"Room with number {roomNumber} not found" });
             }
             return Ok(response.Data);
+        }
+
+        // GET: api/Room/get-by-token/{token}
+        [HttpGet("get-by-token/{token}")]
+        public async Task<ActionResult<RoomModel>> GetRoomByQrToken(string token)
+        {
+             var response = await _roomRepository.GetRoomByQrTokenAsync(token);
+             if (!response.Success || response.Data == null)
+             {
+                 return NotFound(new { message = response.Message ?? "Room not found" });
+             }
+             return Ok(response.Data);
         }
 
         // GET: api/Room/status/{status}

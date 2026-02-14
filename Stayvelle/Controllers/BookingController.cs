@@ -4,8 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Stayvelle.IRepository;
 using Stayvelle.Models;
-using Stayvelle.Models.DTOs;
-using Stayvelle.Query;
+using Stayvelle.Models;
+
 
 namespace Stayvelle.Controllers
 {

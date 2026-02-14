@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Stayvelle.IRepository;
 using Stayvelle.Models;
-using Stayvelle.Query;
+using Stayvelle.Models;
 
 namespace Stayvelle.Controllers
 {

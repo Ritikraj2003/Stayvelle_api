@@ -5,9 +5,10 @@ using Stayvelle.IRepository;
 using Stayvelle.Models;
 using Stayvelle.Query;
 
+
 using Microsoft.Extensions.Configuration;
 using Stayvelle.Services;
-using Stayvelle.Models.DTOs;
+using Stayvelle.Models;
 
 namespace Stayvelle.RepositoryImpl
 {

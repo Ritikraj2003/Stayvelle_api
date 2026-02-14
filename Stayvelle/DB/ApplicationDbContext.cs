@@ -26,6 +26,7 @@ namespace Stayvelle.DB
         public DbSet<BookingServiceModel> BookingServiceModel { get; set; }
         public DbSet<RoomDiscountModel> RoomDiscountModel { get; set; }
         public DbSet<DocumentModel> DocumentModel { get; set; }
+        public DbSet<BookingSessionModel> BookingSessionModel { get; set; }
         
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

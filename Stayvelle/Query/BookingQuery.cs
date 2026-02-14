@@ -14,7 +14,8 @@ namespace Stayvelle.Query
                 ""CreatedOn"", 
                 ""ActualCheckInTime"",
                 ""ActualCheckOutTime"",
-                ""RoomNumber""
+                ""RoomNumber"",
+                ""AccessPin""
             ) 
             VALUES 
             (
@@ -27,7 +28,8 @@ namespace Stayvelle.Query
                 @CreatedOn, 
                 @ActualCheckInTime,
                 @ActualCheckOutTime,
-                @RoomNumber
+                @RoomNumber,
+                @AccessPin
             ) 
             RETURNING ""BookingId"";";
 

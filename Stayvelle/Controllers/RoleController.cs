@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Stayvelle.DB;
 using Stayvelle.IRepository;
 using Stayvelle.Models;
-using Stayvelle.Query;
+using Stayvelle.Models;
 
 namespace Stayvelle.Controllers
 {

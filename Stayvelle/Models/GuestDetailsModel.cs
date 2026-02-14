@@ -1,4 +1,4 @@
-using Stayvelle.Models.DTOs;
+using Stayvelle.Models;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;

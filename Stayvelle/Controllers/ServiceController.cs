@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Stayvelle.Models;
-using Stayvelle.Models.DTOs;
+using Stayvelle.Models;
 using Stayvelle.IRepository;
 using Stayvelle.RepositoryImpl;
 

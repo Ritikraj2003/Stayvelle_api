@@ -2,8 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Stayvelle.DB;
 using Stayvelle.IRepository;
 using Stayvelle.Models;
-using Stayvelle.Models.DTOs;
-using Stayvelle.Query;
+using Stayvelle.Models;
+
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 
@@ -53,6 +53,7 @@ namespace Stayvelle.RepositoryImpl
                 var room = new RoomModel
                 {
                     RoomNumber = createRoomDTO.RoomNumber,
+                    RoomQrToken = Guid.NewGuid().ToString(),
                     Price = createRoomDTO.Price,
                     MaxOccupancy = createRoomDTO.MaxOccupancy,
                     Floor = createRoomDTO.Floor,
@@ -555,6 +556,48 @@ namespace Stayvelle.RepositoryImpl
             catch
             {
                 return false;
+            }
+        }
+        // Read - Get Room By QR Token
+        public async Task<Response<RoomModel?>> GetRoomByQrTokenAsync(string token)
+        {
+            var response = new Response<RoomModel?>();
+            try
+            {
+                var room = await _context.RoomModel
+                    .FirstOrDefaultAsync(r => r.RoomQrToken == token);
+
+                if (room != null)
+                {
+                    // Populate Documents
+                    var documents = await _context.DocumentModel
+                        .Where(d => d.EntityType == "ROOM" && d.EntityId == room.Id)
+                        .ToListAsync();
+
+                    room.Documents = documents.Select(d => new DocumentDto
+                    {
+                        DocumentId = d.DocumentId,
+                        EntityType = d.EntityType,
+                        EntityId = d.EntityId,
+                        DocumentType = d.DocumentType,
+                        FileName = d.FileName,
+                        Description = d.Description,
+                        FilePath = d.FilePath,
+                        IsPrimary = d.IsPrimary
+                    }).ToList();
+                }
+
+                response.Success = room != null;
+                response.Message = room != null ? "Success" : "Room not found";
+                response.Data = room;
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.Success = false;
+                response.Message = ex.Message;
+                response.Data = null;
+                return response;
             }
         }
     }

@@ -1,5 +1,5 @@
 using Stayvelle.Models;
-using Stayvelle.Models.DTOs;
+using Stayvelle.Models;
 
 namespace Stayvelle.IRepository
 {
